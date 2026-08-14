@@ -246,16 +246,65 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                   contentsNotifier.select(entry[_keyUrl]);
                   Navigator.pop(context);
                 },
-                trailing: IconButton(
-                  style: IconButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                  icon: const Icon(Icons.delete_outlined),
-                  onPressed: contentsNotifier.linkList.length > 1
-                      ? () {
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        _showEditTitleDialog(entry, contentsNotifier);
+                        break;
+                      case 'refresh':
+                        contentsNotifier.fetchContent(entry[_keyUrl]);
+                        contentsNotifier.persist();
+                        break;
+                      case 'delete':
+                        if (entry[_keyIsFavorite]) {
+                          _showFavoriteCannotDeleteDialog(
+                            context,
+                            entry,
+                            contentsNotifier,
+                          );
+                        } else {
                           contentsNotifier.remove(entry[_keyUrl]);
                         }
-                      : null,
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_outlined),
+                          const SizedBox(width: 8),
+                          Text(l10n.editTitleLabel),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'refresh',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.refresh_outlined),
+                          const SizedBox(width: 8),
+                          Text(l10n.refreshCacheLabel),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      enabled: contentsNotifier.linkList.length > 1,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outlined,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(l10n.deleteLabel),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             const Divider(height: 1),
@@ -304,6 +353,68 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
     final int secondChar = countryCode.codeUnitAt(1) + 0x1F1A5;
 
     return String.fromCharCode(firstChar) + String.fromCharCode(secondChar);
+  }
+
+  void _showFavoriteCannotDeleteDialog(
+    BuildContext context,
+    Map<String, dynamic> entry,
+    ContentsNotifier contentsNotifier,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteLabel),
+        content: Text(l10n.favoriteCannotDeleteConfirmation),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text(AppLocalizations.of(context)!.commonOk),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditTitleDialog(
+    Map<String, dynamic> entry,
+    ContentsNotifier contentsNotifier,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController(text: entry[_keyTitle]);
+
+    final newTitle = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.editTitleLabel),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.noTitle),
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text(l10n.commonOk),
+          ),
+        ],
+      ),
+    );
+
+    if (newTitle != null) {
+      final trimmedTitle = newTitle.trim();
+      if (trimmedTitle != entry[_keyTitle]) {
+        entry[_keyTitle] = trimmedTitle.isEmpty ? null : trimmedTitle;
+        contentsNotifier.persist();
+      }
+    }
   }
 
   void _clearAllHistory() async {

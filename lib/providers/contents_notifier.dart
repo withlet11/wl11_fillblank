@@ -152,7 +152,7 @@ class ContentsNotifier extends ChangeNotifier {
         _client = http.Client();
         _error = null;
         notifyListeners();
-        await _fetchContent(url);
+        await fetchContent(url);
       }
       _currentParagraphIndex = 0;
       final now = DateTime.now();
@@ -280,7 +280,7 @@ class ContentsNotifier extends ChangeNotifier {
       _client = http.Client();
       _error = null;
       notifyListeners();
-      await _fetchContent(currentUrl);
+      await fetchContent(currentUrl);
       _selectedEntry![_keyFileSize] = getCachedContentSize(currentUrl);
       _selectedEntry![_keyLocale] = getCachedContentLocale(currentUrl);
     } catch (e) {
@@ -291,7 +291,7 @@ class ContentsNotifier extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchContent(String url) async {
+  Future<void> fetchContent(String url) async {
     if (_client == null) throw Exception('Client is null');
 
     final response = await _client!.get(Uri.parse(url));

@@ -66,7 +66,7 @@
     }
   },
   "contentListLabel": "Content List",
-  "contentsRestoreLabel": "restore contents",
+  "contentsRestoreLabel": "Restore contents",
   "contentsRestoreErrorMessage": "failed to import contents: {error}",
   "@contentsRestoreErrorMessage": {
     "description": "Error message shown when importing contents fails.",
@@ -85,10 +85,12 @@
       }
     }
    },
-  "copyAllButton": "Copy all",
   "darkModeLabel": "Dark Mode",
+  "deleteLabel": "Delete",
+  "editTitleLabel": "Edit title",
   "errorLabel": "Error",
   "existingLinkOpenConfirmation": "This link already exists. Do you want to select it?",
+  "favoriteCannotDeleteConfirmation": "This link is a favorite. To delete it, please remove it from your favorites first.",
   "favoritesLabel": "Favorites",
   "fieldAlreadyFilledMessage": "The field is already filled.",
   "fileNotSelectedMessage": "No file selected.",
@@ -143,6 +145,7 @@
   },
   "pasteButton": "Paste",
   "readNavButton": "Read",
+  "refreshCacheLabel": "Refresh Cache",
   "restoreButton": "Restore",
   "settingsNavButton": "Settings",
   "urlCopyRequest": "Please copy the link from your browser's address bar.",
