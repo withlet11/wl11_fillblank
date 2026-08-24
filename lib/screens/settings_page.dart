@@ -1,23 +1,5 @@
-/*
- * settings_page.dart
- *
- * Copyright 2026 Yasuhiro Yamakawa <withlet11@gmail.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
- * and associated documentation files (the "Software"), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge, publish, distribute,
- * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or
- * substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright 2026 WITHLET11 <withlet11@gmail.com>
+// SPDX-License-Identifier: MIT
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -170,6 +152,84 @@ class _SettingsPageState extends State<SettingsPage> {
               : const Icon(Icons.save_outlined),
           onPressed: _isImportingOrExporting ? null : _saveActivity,
         ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.info_outline),
+        title: Text(l10n.eulaLabel),
+        subtitle: Text(l10n.eulaDescription),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(l10n.eulaDialogTitle),
+              content: SingleChildScrollView(child: Text(l10n.eulaText)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      ListTile(
+        leading: const Icon(Icons.library_books_outlined),
+        title: Text(l10n.licensesLabel),
+        subtitle: Text(l10n.licensesDescription),
+        trailing: const Icon(Icons.chevron_right_outlined),
+        onTap: () {
+          showAboutDialog(
+            context: context,
+            applicationName: l10n.appName,
+            applicationVersion: l10n.appVersion,
+            applicationLegalese: l10n.appLegalese,
+            applicationIcon: Image.asset(
+              'assets/images/app_icon.png',
+              width: 64,
+              height: 64,
+            ),
+            // children: [
+            //   const SizedBox(height: 16),
+            //   const Text(
+            //     'Terms of Use & EULA:',
+            //     style: TextStyle(fontWeight: FontWeight.bold),
+            //   ),
+            //   const SizedBox(height: 4),
+            //   const Text(
+            //     'MIT License (Code Only)\n\n'
+            //     'Copyright 2026 Yasuhiro Yamakawa <withlet11@gmail.com>\n\n'
+            //     'Permission is hereby granted, free of charge, to any person obtaining a '
+            //     'copy of this software  and associated documentation files (the '
+            //     '"Software"), to deal in the Software without restriction, including '
+            //     'without limitation the rights to use, copy, modify, merge, publish, '
+            //     'distribute, sublicense, and/or sell copies of the Software, and to permit '
+            //     'persons to whom the Software is furnished to do so, subject to the '
+            //     'following conditions:\n\n'
+            //     'The above copyright notice and this permission notice shall be included '
+            //     'in all copies or  substantial portions of the Software.\n\n'
+            //     'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS '
+            //     'OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF '
+            //     'MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN '
+            //     'NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, '
+            //     'DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR '
+            //     'OTHERWISE, ARISING FROM,  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR '
+            //     'THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n'
+            //     '====================================================================\n'
+            //     'TRADEMARK & BRANDING ASSETS NOTICE (EXCLUDED FROM MIT LICENSE)\n'
+            //     '====================================================================\n\n'
+            //     'The "MIT License" above applies ONLY to the source code of this repository.\n\n'
+            //     '1. TRADEMARKS & LOGOS: The name "ReadBlank", the app icon, custom logos,'
+            //     'brand colors, and original artwork located in `assets/` are NOT licensed'
+            //     'under MIT and are reserved strictly under copyright and trademark law.\n\n'
+            //     '2. COMMERCIAL REDISTRIBUTION: Anyone may build or fork this project, but'
+            //     'redistributed or sold versions MUST remove all instances of "ReadBlank",'
+            //     'replace the app icons/logos, and cannot use official backend API endpoints.',
+            //   ),
+            // ],
+          );
+        },
       ),
     ];
 
