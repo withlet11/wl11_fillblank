@@ -184,6 +184,7 @@ class ContentsNotifier extends ChangeNotifier {
       _linkList.isNotEmpty && _linkList.first[_keyUrl] == url;
 
   Future<void> select(String url) async {
+    _error = null;
     final index = _linkList.indexWhere((e) => e[_keyUrl] == url);
     if (index > 0) {
       _linkList.first[_keyLastViewedParagraphIndex] = _currentParagraphIndex;
@@ -196,6 +197,8 @@ class ContentsNotifier extends ChangeNotifier {
       persist();
     } else if (index != 0) {
       add(url);
+    } else {
+      notifyListeners();
     }
   }
 
@@ -254,6 +257,12 @@ class ContentsNotifier extends ChangeNotifier {
   String? get data => _data;
 
   String? get error => _error;
+
+  void cancelLoading() {
+    _client?.close();
+    _client = null;
+    notifyListeners();
+  }
 
   Future<void> fetchCurrentContent() async {
     if (currentParagraphList != null || isLoading) return;

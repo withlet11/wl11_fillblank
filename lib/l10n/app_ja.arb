@@ -18,6 +18,7 @@
   "backupButton": "バックアップ",
   "clipboardEmptyMessage": "クリップボードが空です。エクスポートデータのコピーが必要です。",
   "commonCancel": "キャンセル",
+  "commonClose": "閉じる",
   "commonOk": "了解",
   "commonOpen": "開く",
   "commonYes": "はい",

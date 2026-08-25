@@ -24,7 +24,8 @@ class _ReadPageState extends State<ReadPage> {
       builder: (context, notifier, child) {
         if (notifier.linkList.isNotEmpty &&
             notifier.currentParagraphList == null &&
-            !notifier.isLoading) {
+            !notifier.isLoading &&
+            notifier.error == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             notifier.fetchCurrentContent();
           });

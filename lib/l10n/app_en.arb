@@ -43,6 +43,7 @@
     "description": "Error message shown when the clipboard is empty before importing JSON data."
   },
   "commonCancel": "Cancel",
+  "commonClose": "Close",
   "commonOpen": "Open",
   "commonOk": "OK",
   "commonYes": "Yes",

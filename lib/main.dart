@@ -219,12 +219,22 @@ class _MainPageState extends State<MainPage> {
           ),
         ),
         Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.library_books_outlined),
-            onPressed: () {
-              Scaffold.of(context).openEndDrawer();
-            },
-          ),
+          builder: (context) => contentsNotifier.isLoading
+              ? IconButton(
+                  icon: Icon(
+                    Icons.stop_circle_outlined,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () {
+                    contentsNotifier.cancelLoading();
+                  },
+                )
+              : IconButton(
+                  icon: const Icon(Icons.library_books_outlined),
+                  onPressed: () {
+                    Scaffold.of(context).openEndDrawer();
+                  },
+                ),
         ),
       ],
     );
