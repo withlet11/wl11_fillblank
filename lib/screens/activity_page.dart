@@ -28,15 +28,14 @@ class _ActivityPageState extends State<ActivityPage> {
       WeeklyChartViewController();
   final MonthlyChartViewController _monthlyChartController =
       MonthlyChartViewController();
-  late DateTime _selectedDate = today;
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ActivityNotifier>(
       builder: (context, notifier, child) {
-        final hasData = notifier.wordLog.isNotEmpty;
-
-        if (notifier.isLoading && !hasData) {
+        if (notifier.isLoading &&
+            notifier.wordLog.isEmpty &&
+            notifier.currentChartData.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -79,16 +78,12 @@ class _ActivityPageState extends State<ActivityPage> {
     return DateTime(date.year, date.month, 1);
   }
 
-  int _getDurationOfMonth(DateTime date) {
-    return DateTime(date.year, date.month + 1, 0).day;
-  }
-
   DateTime _getOneDayAgo(DateTime date) {
-    return _selectedDate.subtract(const Duration(days: 1));
+    return date.subtract(const Duration(days: 1));
   }
 
   DateTime _getOneDayLater(DateTime date) {
-    return _selectedDate.add(const Duration(days: 1));
+    return date.add(const Duration(days: 1));
   }
 
   DateTime _getSevenDaysAgo(DateTime date) {
@@ -172,22 +167,19 @@ class _ActivityPageState extends State<ActivityPage> {
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
         .fontSizeFactor;
+    final selectedDate = notifier.selectedDate;
 
-    if (_isBeforeStartDate(_selectedDate)) {
-      _selectedDate = _startDate;
-    } else if (_isAfterToday(_selectedDate)) {
-      _selectedDate = today;
+    if (_isBeforeStartDate(selectedDate)) {
+      notifier.selectedDate = _startDate;
+    } else if (_isAfterToday(selectedDate)) {
+      notifier.selectedDate = today;
     }
 
-    final currentData = notifier.getHalfHourlyCountsPerDay(_selectedDate);
-    final previousData = _isOnOrBeforeStartDate(_selectedDate)
-        ? <int>[]
-        : notifier.getHalfHourlyCountsPerDay(_getOneDayAgo(_selectedDate));
-    final nextData = _isOnOrAfterToday(_selectedDate)
-        ? <int>[]
-        : notifier.getHalfHourlyCountsPerDay(_getOneDayLater(_selectedDate));
+    final currentData = notifier.currentChartData;
+    final previousData = notifier.previousChartData;
+    final nextData = notifier.nextChartData;
 
-    final entries = notifier.getWordCountsForDuration(_selectedDate, 1);
+    final entries = notifier.currentWordCounts;
 
     return Column(
       children: [
@@ -198,26 +190,22 @@ class _ActivityPageState extends State<ActivityPage> {
               children: [
                 IconButton(
                   icon: Icon(Icons.keyboard_arrow_left),
-                  onPressed: _isOnOrBeforeStartDate(_selectedDate)
+                  onPressed: _isOnOrBeforeStartDate(selectedDate)
                       ? null
                       : () {
-                          setState(() {
-                            _selectedDate = _getOneDayAgo(_selectedDate);
-                          });
+                          notifier.selectedDate = _getOneDayAgo(selectedDate);
                         },
                 ),
                 Text(
-                  l10n.dateFormatForDailyChart(_selectedDate),
+                  l10n.dateFormatForDailyChart(selectedDate),
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 IconButton(
                   icon: Icon(Icons.keyboard_arrow_right),
-                  onPressed: _isOnOrAfterToday(_selectedDate)
+                  onPressed: _isOnOrAfterToday(selectedDate)
                       ? null
                       : () {
-                          setState(() {
-                            _selectedDate = _getOneDayLater(_selectedDate);
-                          });
+                          notifier.selectedDate = _getOneDayLater(selectedDate);
                         },
                 ),
               ],
@@ -226,7 +214,7 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.abc),
-                Text(l10n.wordCount(notifier.getDailyWordCount(_selectedDate))),
+                Text(l10n.wordCount(notifier.currentCount)),
               ],
             ),
             DailyChartView(
@@ -237,19 +225,15 @@ class _ActivityPageState extends State<ActivityPage> {
               barColor: Theme.of(context).colorScheme.tertiary,
               textColor: Theme.of(context).colorScheme.onSurface,
               fontSize: 12.0 * fontSizeFactor,
-              onSwipeLeft: _isOnOrAfterToday(_selectedDate)
+              onSwipeLeft: _isOnOrAfterToday(selectedDate)
                   ? null
                   : () {
-                      setState(() {
-                        _selectedDate = _getOneDayLater(_selectedDate);
-                      });
+                      notifier.selectedDate = _getOneDayLater(selectedDate);
                     },
-              onSwipeRight: _isOnOrBeforeStartDate(_selectedDate)
+              onSwipeRight: _isOnOrBeforeStartDate(selectedDate)
                   ? null
                   : () {
-                      setState(() {
-                        _selectedDate = _getOneDayAgo(_selectedDate);
-                      });
+                      notifier.selectedDate = _getOneDayAgo(selectedDate);
                     },
             ),
             SizedBox(height: 16),
@@ -286,10 +270,10 @@ class _ActivityPageState extends State<ActivityPage> {
     );
   }
 
-  String _dateLabelForWeeklyChart() {
+  String _dateLabelForWeeklyChart(DateTime selectedDate) {
     final l10n = AppLocalizations.of(context)!;
-    final startDay = _getStartDayOfWeek(_selectedDate);
-    final endDay = _geEndDayOfWeek(_selectedDate);
+    final startDay = _getStartDayOfWeek(selectedDate);
+    final endDay = _geEndDayOfWeek(selectedDate);
     return (_isInSameMonth(startDay, endDay)
         ? l10n.dateFormatForWeeklyChartInSameMonth
         : _isInSameYear(startDay, endDay)
@@ -302,23 +286,19 @@ class _ActivityPageState extends State<ActivityPage> {
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
         .fontSizeFactor;
+    final selectedDate = notifier.selectedDate;
 
-    if (_isBeforeStartWeek(_selectedDate)) {
-      _selectedDate = _startDate;
-    } else if (_isAfterThisWeek(_selectedDate)) {
-      _selectedDate = today;
+    if (_isBeforeStartWeek(selectedDate)) {
+      notifier.selectedDate = _startDate;
+    } else if (_isAfterThisWeek(selectedDate)) {
+      notifier.selectedDate = today;
     }
 
-    final firstDay = _getStartDayOfWeek(_selectedDate);
-    final currentData = notifier.getDailyCountsPerWeek(firstDay);
-    final previousData = _isInOrBeforeStartWeek(_selectedDate)
-        ? <int>[]
-        : notifier.getDailyCountsPerWeek(_getSevenDaysAgo(firstDay));
-    final nextData = _isInOrAfterThisWeek(_selectedDate)
-        ? <int>[]
-        : notifier.getDailyCountsPerWeek(_getSevenDaysLater(firstDay));
+    final currentData = notifier.currentChartData;
+    final previousData = notifier.previousChartData;
+    final nextData = notifier.nextChartData;
 
-    final entries = notifier.getWordCountsForDuration(firstDay, 7);
+    final entries = notifier.currentWordCounts;
 
     return Column(
       children: [
@@ -329,17 +309,17 @@ class _ActivityPageState extends State<ActivityPage> {
               children: [
                 IconButton(
                   icon: Icon(Icons.keyboard_arrow_left),
-                  onPressed: _isInOrBeforeStartWeek(_selectedDate)
+                  onPressed: _isInOrBeforeStartWeek(selectedDate)
                       ? null
                       : () {
-                          setState(() {
-                            _selectedDate = _getSevenDaysAgo(_selectedDate);
-                          });
+                          notifier.selectedDate = _getSevenDaysAgo(
+                            selectedDate,
+                          );
                         },
                 ),
                 Expanded(
                   child: Text(
-                    _dateLabelForWeeklyChart(),
+                    _dateLabelForWeeklyChart(selectedDate),
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     style: Theme.of(context).textTheme.bodyLarge,
@@ -347,12 +327,12 @@ class _ActivityPageState extends State<ActivityPage> {
                 ),
                 IconButton(
                   icon: Icon(Icons.keyboard_arrow_right),
-                  onPressed: _isInOrAfterThisWeek(_selectedDate)
+                  onPressed: _isInOrAfterThisWeek(selectedDate)
                       ? null
                       : () {
-                          setState(() {
-                            _selectedDate = _getSevenDaysLater(_selectedDate);
-                          });
+                          notifier.selectedDate = _getSevenDaysLater(
+                            selectedDate,
+                          );
                         },
                 ),
               ],
@@ -361,7 +341,7 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.abc),
-                Text(l10n.wordCount(notifier.getWeeklyWordCount(firstDay))),
+                Text(l10n.wordCount(notifier.currentCount)),
               ],
             ),
             WeeklyChartView(
@@ -372,28 +352,24 @@ class _ActivityPageState extends State<ActivityPage> {
               barColor: Theme.of(context).colorScheme.tertiary,
               textColor: Theme.of(context).colorScheme.onSurface,
               fontSize: 12.0 * fontSizeFactor,
-              onSwipeLeft: _isInOrAfterThisWeek(_selectedDate)
+              onSwipeLeft: _isInOrAfterThisWeek(selectedDate)
                   ? null
                   : () {
-                      setState(() {
-                        _selectedDate = _getSevenDaysLater(_selectedDate);
-                      });
+                      notifier.selectedDate = _getSevenDaysLater(selectedDate);
                     },
-              onSwipeRight: _isInOrBeforeStartWeek(_selectedDate)
+              onSwipeRight: _isInOrBeforeStartWeek(selectedDate)
                   ? null
                   : () {
-                      setState(() {
-                        _selectedDate = _getSevenDaysAgo(_selectedDate);
-                      });
+                      notifier.selectedDate = _getSevenDaysAgo(selectedDate);
                     },
               onDailyViewSelected: (int index) {
                 final tappedDate = _getStartDayOfWeek(
-                  _selectedDate,
+                  selectedDate,
                 ).add(Duration(days: index));
 
                 if (_isNotInRange(tappedDate)) return;
 
-                _selectedDate = tappedDate;
+                notifier.selectedDate = tappedDate;
                 notifier.viewMode = ActivityViewMode.daily;
               },
             ),
@@ -436,19 +412,13 @@ class _ActivityPageState extends State<ActivityPage> {
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
         .fontSizeFactor;
+    final selectedDate = notifier.selectedDate;
 
-    final currentData = notifier.getDailyCountsPerMonth(_selectedDate);
-    final previousData = _isInOrBeforeStartMonth(_selectedDate)
-        ? <int>[]
-        : notifier.getDailyCountsPerMonth(_getOneMonthAgo(_selectedDate));
-    final nextData = _isInOrAfterThisMonth(_selectedDate)
-        ? <int>[]
-        : notifier.getDailyCountsPerMonth(_getOneMonthLater(_selectedDate));
+    final currentData = notifier.currentChartData;
+    final previousData = notifier.previousChartData;
+    final nextData = notifier.nextChartData;
 
-    final entries = notifier.getWordCountsForDuration(
-      _getStartDayOfMonth(_selectedDate),
-      _getDurationOfMonth(_selectedDate),
-    );
+    final entries = notifier.currentWordCounts;
 
     return Column(
       children: [
@@ -459,29 +429,27 @@ class _ActivityPageState extends State<ActivityPage> {
               children: [
                 IconButton(
                   icon: Icon(Icons.keyboard_arrow_left),
-                  onPressed: _isInOrBeforeStartMonth(_selectedDate)
+                  onPressed: _isInOrBeforeStartMonth(selectedDate)
                       ? null
                       : () {
-                          setState(() {
-                            _selectedDate = _getOneMonthAgo(_selectedDate);
-                          });
+                          notifier.selectedDate = _getOneMonthAgo(selectedDate);
                         },
                 ),
                 Expanded(
                   child: Text(
-                    l10n.dateFormatForMonthlyChart(_selectedDate),
+                    l10n.dateFormatForMonthlyChart(selectedDate),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ),
                 IconButton(
                   icon: Icon(Icons.keyboard_arrow_right),
-                  onPressed: _isInOrAfterThisMonth(_selectedDate)
+                  onPressed: _isInOrAfterThisMonth(selectedDate)
                       ? null
                       : () {
-                          setState(() {
-                            _selectedDate = _getOneMonthLater(_selectedDate);
-                          });
+                          notifier.selectedDate = _getOneMonthLater(
+                            selectedDate,
+                          );
                         },
                 ),
               ],
@@ -490,9 +458,7 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.abc),
-                Text(
-                  l10n.wordCount(notifier.getMonthlyWordCount(_selectedDate)),
-                ),
+                Text(l10n.wordCount(notifier.currentCount)),
               ],
             ),
             MonthlyChartView(
@@ -500,39 +466,35 @@ class _ActivityPageState extends State<ActivityPage> {
               currentData: currentData,
               previousData: previousData,
               nextData: nextData,
-              startWeekDay: _getStartDayOfMonth(_selectedDate).weekday - 1,
+              startWeekDay: _getStartDayOfMonth(selectedDate).weekday - 1,
               circleColor: Theme.of(context).colorScheme.tertiary,
               textColor: Theme.of(context).colorScheme.onSurface,
               fontSize: 12.0 * fontSizeFactor,
-              onSwipeLeft: _isInOrAfterThisMonth(_selectedDate)
+              onSwipeLeft: _isInOrAfterThisMonth(selectedDate)
                   ? null
                   : () {
-                      setState(() {
-                        _selectedDate = _getOneMonthLater(_selectedDate);
-                      });
+                      notifier.selectedDate = _getOneMonthLater(selectedDate);
                     },
-              onSwipeRight: _isInOrBeforeStartMonth(_selectedDate)
+              onSwipeRight: _isInOrBeforeStartMonth(selectedDate)
                   ? null
                   : () {
-                      setState(() {
-                        _selectedDate = _getOneMonthAgo(_selectedDate);
-                      });
+                      notifier.selectedDate = _getOneMonthAgo(selectedDate);
                     },
               onDailyViewSelected: (int index) {
                 final startOffset =
-                    _getStartDayOfMonth(_selectedDate).weekday - 1;
+                    _getStartDayOfMonth(selectedDate).weekday - 1;
                 final tappedDate = DateTime(
-                  _selectedDate.year,
-                  _selectedDate.month,
+                  selectedDate.year,
+                  selectedDate.month,
                   index - startOffset + 1,
                 );
 
-                if (!_isInSameMonth(tappedDate, _selectedDate) ||
+                if (!_isInSameMonth(tappedDate, selectedDate) ||
                     _isNotInRange(tappedDate)) {
                   return;
                 }
 
-                _selectedDate = tappedDate;
+                notifier.selectedDate = tappedDate;
                 notifier.viewMode = ActivityViewMode.daily;
               },
             ),

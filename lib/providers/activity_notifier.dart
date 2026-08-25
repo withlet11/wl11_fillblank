@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -31,8 +31,46 @@ class ActivityNotifier extends ChangeNotifier {
   List<Map<String, dynamic>> _wordLog = List.empty(growable: true);
   ActivityViewMode _viewMode = ActivityViewMode.daily;
 
+  DateTime _selectedDate = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+
+  List<int> _currentChartData = List<int>.filled(48, 0);
+  List<int> _previousChartData = List<int>.filled(48, 0);
+  List<int> _nextChartData = List<int>.filled(48, 0);
+  List<MapEntry<String, int>> _currentWordCounts = [];
+  List<MapEntry<String, int>> _previousWordCounts = [];
+  List<MapEntry<String, int>> _nextWordCounts = [];
+  int _currentCount = 0;
+
+  ActivityViewMode? _lastFetchedMode;
+  int _refreshId = 0;
+
+  // Cache
+  final Map<String, List<int>> _chartCache = {};
+  final Map<String, List<MapEntry<String, int>>> _wordCountsCache = {};
+  final Map<String, int> _totalCountCache = {};
+
   ActivityNotifier() {
-    fetchLog();
+    _initSkeletons();
+    refreshData();
+  }
+
+  void _initSkeletons() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    _currentChartData = _getSkeleton(ActivityViewMode.daily, today);
+    _previousChartData = _getSkeleton(
+      ActivityViewMode.daily,
+      _getPreviousPeriodDate(ActivityViewMode.daily, today),
+    );
+    _nextChartData = _getSkeleton(
+      ActivityViewMode.daily,
+      _getNextPeriodDate(ActivityViewMode.daily, today),
+    );
   }
 
   bool get isLoading => _isLoading;
@@ -40,21 +78,348 @@ class ActivityNotifier extends ChangeNotifier {
   ActivityViewMode get viewMode => _viewMode;
 
   set viewMode(ActivityViewMode mode) {
+    if (_viewMode == mode) return;
+    final oldMode = _viewMode;
     _viewMode = mode;
-    notifyListeners();
+    refreshData(oldMode: oldMode);
   }
 
+  DateTime get selectedDate => _selectedDate;
+
+  set selectedDate(DateTime date) {
+    final newDate = DateTime(date.year, date.month, date.day);
+    if (_selectedDate.isAtSameMomentAs(newDate)) return;
+    final oldDate = _selectedDate;
+    _selectedDate = newDate;
+    refreshData(oldDate: oldDate);
+  }
+
+  List<int> get currentChartData => _currentChartData;
+
+  List<int> get previousChartData => _previousChartData;
+
+  List<int> get nextChartData => _nextChartData;
+
+  List<MapEntry<String, int>> get currentWordCounts => _currentWordCounts;
+
+  int get currentCount => _currentCount;
+
   List<Map<String, dynamic>> get wordLog => _wordLog;
+
+  List<int> _getSkeleton(ActivityViewMode mode, DateTime date) {
+    switch (mode) {
+      case ActivityViewMode.daily:
+        return List<int>.filled(48, 0);
+      case ActivityViewMode.weekly:
+        return List<int>.filled(7, 0);
+      case ActivityViewMode.monthly:
+        return List<int>.filled(DateTime(date.year, date.month + 1, 0).day, 0);
+    }
+  }
+
+  String _getCacheKey(ActivityViewMode mode, DateTime date) {
+    switch (mode) {
+      case ActivityViewMode.daily:
+        return 'daily_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      case ActivityViewMode.weekly:
+        final firstDay = date.subtract(Duration(days: date.weekday - 1));
+        return 'weekly_${firstDay.year}-${firstDay.month.toString().padLeft(2, '0')}-${firstDay.day.toString().padLeft(2, '0')}';
+      case ActivityViewMode.monthly:
+        return 'monthly_${date.year}-${date.month.toString().padLeft(2, '0')}';
+    }
+  }
+
+  bool _isWordCountsEqual(
+    List<MapEntry<String, int>> a,
+    List<MapEntry<String, int>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].key != b[i].key || a[i].value != b[i].value) return false;
+    }
+    return true;
+  }
+
+  Future<void> refreshData({
+    DateTime? oldDate,
+    ActivityViewMode? oldMode,
+  }) async {
+    final currentRefreshId = ++_refreshId;
+    final key = _getCacheKey(_viewMode, _selectedDate);
+
+    bool promoted = false;
+    if (oldMode == _viewMode &&
+        oldDate != null &&
+        _lastFetchedMode == _viewMode) {
+      if (_selectedDate.isAtSameMomentAs(
+        _getPreviousPeriodDate(_viewMode, oldDate),
+      )) {
+        // Moved to previous
+        _nextChartData = _currentChartData;
+        _nextWordCounts = _currentWordCounts;
+        _currentChartData = _previousChartData;
+        _currentWordCounts = _previousWordCounts;
+        final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
+        final prevKey = _getCacheKey(_viewMode, prevDate);
+        _previousChartData =
+            _chartCache[prevKey] ?? _getSkeleton(_viewMode, prevDate);
+        _previousWordCounts = _wordCountsCache[prevKey] ?? [];
+        promoted = true;
+      } else if (_selectedDate.isAtSameMomentAs(
+        _getNextPeriodDate(_viewMode, oldDate),
+      )) {
+        // Moved to next
+        _previousChartData = _currentChartData;
+        _previousWordCounts = _currentWordCounts;
+        _currentChartData = _nextChartData;
+        _currentWordCounts = _nextWordCounts;
+        final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
+        final nextKey = _getCacheKey(_viewMode, nextDate);
+        _nextChartData =
+            _chartCache[nextKey] ?? _getSkeleton(_viewMode, nextDate);
+        _nextWordCounts = _wordCountsCache[nextKey] ?? [];
+        promoted = true;
+      }
+    }
+
+    final cachedChart = _chartCache[key];
+    final cachedWordCounts = _wordCountsCache[key];
+    final isCached = cachedChart != null && cachedWordCounts != null;
+
+    if (promoted) {
+      _currentCount = _currentWordCounts.fold(
+        0,
+        (sum, entry) => sum + entry.value,
+      );
+      _isLoading = false;
+    } else if (isCached) {
+      _currentChartData = cachedChart;
+      _currentWordCounts = cachedWordCounts;
+      _currentCount = _currentWordCounts.fold(
+        0,
+        (sum, entry) => sum + entry.value,
+      );
+      final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
+      final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
+      final prevKey = _getCacheKey(_viewMode, prevDate);
+      final nextKey = _getCacheKey(_viewMode, nextDate);
+      _previousChartData =
+          _chartCache[prevKey] ?? _getSkeleton(_viewMode, prevDate);
+      _nextChartData =
+          _chartCache[nextKey] ?? _getSkeleton(_viewMode, nextDate);
+      _isLoading = false;
+    } else {
+      _currentChartData = _getSkeleton(_viewMode, _selectedDate);
+      _currentWordCounts = [];
+      _currentCount = 0;
+      final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
+      final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
+      final prevKey = _getCacheKey(_viewMode, prevDate);
+      final nextKey = _getCacheKey(_viewMode, nextDate);
+      _previousChartData =
+          _chartCache[prevKey] ?? _getSkeleton(_viewMode, prevDate);
+      _nextChartData =
+          _chartCache[nextKey] ?? _getSkeleton(_viewMode, nextDate);
+      _previousWordCounts = _wordCountsCache[prevKey] ?? [];
+      _nextWordCounts = _wordCountsCache[nextKey] ?? [];
+      _isLoading = true;
+    }
+
+    // Always notify once synchronously if properties changed to update labels/view
+    notifyListeners();
+
+    try {
+      final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
+      final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
+
+      final results = await Future.wait([
+        _getChartData(_viewMode, _selectedDate),
+        _getChartData(_viewMode, prevDate),
+        _getChartData(_viewMode, nextDate),
+        _getWordCounts(_viewMode, _selectedDate),
+        _getWordCounts(_viewMode, prevDate),
+        _getWordCounts(_viewMode, nextDate),
+      ]);
+
+      if (currentRefreshId != _refreshId) return;
+
+      final newCurrentChart = results[0] as List<int>;
+      final newPrevChart = results[1] as List<int>;
+      final newNextChart = results[2] as List<int>;
+      final newWordCounts = results[3] as List<MapEntry<String, int>>;
+      final newPrevWordCounts = results[4] as List<MapEntry<String, int>>;
+      final newNextWordCounts = results[5] as List<MapEntry<String, int>>;
+
+      bool dataUpdated = false;
+      if (!listEquals(_currentChartData, newCurrentChart)) {
+        _currentChartData = newCurrentChart;
+        dataUpdated = true;
+      }
+      if (!listEquals(_previousChartData, newPrevChart)) {
+        _previousChartData = newPrevChart;
+        dataUpdated = true;
+      }
+      if (!listEquals(_nextChartData, newNextChart)) {
+        _nextChartData = newNextChart;
+        dataUpdated = true;
+      }
+      if (!_isWordCountsEqual(_currentWordCounts, newWordCounts)) {
+        _currentWordCounts = newWordCounts;
+        _currentCount = _currentWordCounts.fold(
+          0,
+          (sum, entry) => sum + entry.value,
+        );
+        dataUpdated = true;
+      }
+      if (!_isWordCountsEqual(_previousWordCounts, newPrevWordCounts)) {
+        _previousWordCounts = newPrevWordCounts;
+        dataUpdated = true;
+      }
+      if (!_isWordCountsEqual(_nextWordCounts, newNextWordCounts)) {
+        _nextWordCounts = newNextWordCounts;
+        dataUpdated = true;
+      }
+
+      _lastFetchedMode = _viewMode;
+
+      if (dataUpdated || _isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+
+      // Trigger prefetch in background
+      _prefetch(_selectedDate);
+    } catch (e) {
+      if (currentRefreshId == _refreshId && _isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      rethrow;
+    }
+  }
+
+  DateTime _getPreviousPeriodDate(ActivityViewMode mode, DateTime date) {
+    switch (mode) {
+      case ActivityViewMode.daily:
+        return date.subtract(const Duration(days: 1));
+      case ActivityViewMode.weekly:
+        return date.subtract(const Duration(days: 7));
+      case ActivityViewMode.monthly:
+        return DateTime(date.year, date.month - 1, 1);
+    }
+  }
+
+  DateTime _getNextPeriodDate(ActivityViewMode mode, DateTime date) {
+    switch (mode) {
+      case ActivityViewMode.daily:
+        return date.add(const Duration(days: 1));
+      case ActivityViewMode.weekly:
+        return date.add(const Duration(days: 7));
+      case ActivityViewMode.monthly:
+        return DateTime(date.year, date.month + 1, 1);
+    }
+  }
+
+  Future<List<int>> _getChartData(ActivityViewMode mode, DateTime date) async {
+    final key = _getCacheKey(mode, date);
+    if (_chartCache.containsKey(key)) return _chartCache[key]!;
+
+    List<int> data;
+    switch (mode) {
+      case ActivityViewMode.daily:
+        data = await _getHalfHourlyCountsPerDay(date);
+        break;
+      case ActivityViewMode.weekly:
+        final firstDay = date.subtract(Duration(days: date.weekday - 1));
+        data = await _getDailyCountsPerWeek(firstDay);
+        break;
+      case ActivityViewMode.monthly:
+        data = await _getDailyCountsPerMonth(date);
+        break;
+    }
+    _chartCache[key] = data;
+    return data;
+  }
+
+  Future<List<MapEntry<String, int>>> _getWordCounts(
+    ActivityViewMode mode,
+    DateTime date,
+  ) async {
+    final key = _getCacheKey(mode, date);
+    if (_wordCountsCache.containsKey(key)) return _wordCountsCache[key]!;
+
+    List<MapEntry<String, int>> data;
+    switch (mode) {
+      case ActivityViewMode.daily:
+        data = await _getWordCountsForDuration(date, 1);
+        break;
+      case ActivityViewMode.weekly:
+        final firstDay = date.subtract(Duration(days: date.weekday - 1));
+        data = await _getWordCountsForDuration(firstDay, 7);
+        break;
+      case ActivityViewMode.monthly:
+        final firstDay = DateTime(date.year, date.month, 1);
+        final lastDay = DateTime(date.year, date.month + 1, 0);
+        data = await _getWordCountsForDuration(firstDay, lastDay.day);
+        break;
+    }
+    _wordCountsCache[key] = data;
+    return data;
+  }
+
+  void _prefetch(DateTime date) async {
+    // Cross-mode prefetch
+    final modesToFetch = ActivityViewMode.values.where((m) => m != _viewMode);
+    for (final mode in modesToFetch) {
+      _getChartData(mode, date);
+      _getWordCounts(mode, date);
+    }
+
+    // Neighbors of neighbors (e.g. +/- 2 days)
+    final prevPrevDate = _getPreviousPeriodDate(
+      _viewMode,
+      _getPreviousPeriodDate(_viewMode, date),
+    );
+    final nextNextDate = _getNextPeriodDate(
+      _viewMode,
+      _getNextPeriodDate(_viewMode, date),
+    );
+    _getChartData(_viewMode, prevPrevDate);
+    _getChartData(_viewMode, nextNextDate);
+    _getWordCounts(_viewMode, prevPrevDate);
+    _getWordCounts(_viewMode, nextNextDate);
+  }
+
+  void _invalidateCacheForDate(DateTime date) {
+    final dailyKey = _getCacheKey(ActivityViewMode.daily, date);
+    final weeklyKey = _getCacheKey(ActivityViewMode.weekly, date);
+    final monthlyKey = _getCacheKey(ActivityViewMode.monthly, date);
+
+    _chartCache.remove(dailyKey);
+    _chartCache.remove(weeklyKey);
+    _chartCache.remove(monthlyKey);
+
+    _wordCountsCache.remove(dailyKey);
+    _wordCountsCache.remove(weeklyKey);
+    _wordCountsCache.remove(monthlyKey);
+
+    _totalCountCache.remove(dailyKey);
+    _totalCountCache.remove(weeklyKey);
+    _totalCountCache.remove(monthlyKey);
+  }
 
   Future<void> fetchLog() async {
     _isLoading = true;
     notifyListeners();
 
+    _chartCache.clear();
+    _wordCountsCache.clear();
+    _totalCountCache.clear();
+
     final log = await _db.getAllEntries();
     _wordLog = List<Map<String, dynamic>>.from(log);
 
-    _isLoading = false;
-    notifyListeners();
+    await refreshData();
   }
 
   Future<void> addWord(
@@ -72,48 +437,22 @@ class ActivityNotifier extends ChangeNotifier {
     });
     if (_wordLog.length > 10000) _wordLog.removeLast();
 
-    notifyListeners();
+    _invalidateCacheForDate(DateTime.parse(timestamp));
+    await refreshData();
   }
 
-  List<Map<String, dynamic>> extractLogForDuration(
+  Future<List<MapEntry<String, int>>> _getWordCountsForDuration(
     DateTime date,
     int duration,
-  ) {
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = startOfDay.add(Duration(days: duration));
-    return _wordLog.where((log) {
-      final logDate = DateTime.parse(log[_keyTimestamp] as String);
-      return logDate.isAfter(startOfDay) && logDate.isBefore(endOfDay);
+  ) async {
+    final log = await _db.getSummaryList(date, duration);
+    return log.map((e) {
+      return MapEntry(e[_keyWord] as String, e['count'] as int);
     }).toList();
   }
 
-  List<MapEntry<String, int>> getWordCountsForDuration(
-    DateTime date,
-    int duration,
-  ) {
-    final studyLog = extractLogForDuration(date, duration);
-    final result = <String, int>{};
-    for (var log in studyLog) {
-      final word = log[_keyWord] as String;
-      result[word] = (result[word] ?? 0) + 1;
-    }
-    List<MapEntry<String, int>> temp = result.entries.toList();
-    temp.sort((a, b) => b.value.compareTo(a.value));
-    return temp;
-  }
-
-  int getDailyWordCount(DateTime date) => extractLogForDuration(date, 1).length;
-
-  int getWeeklyWordCount(DateTime date) =>
-      extractLogForDuration(date, 7).length;
-
-  int getMonthlyWordCount(DateTime date) => extractLogForDuration(
-    DateTime(date.year, date.month, 1),
-    DateTime(date.year, date.month + 1, 0).day,
-  ).length;
-
-  List<int> getHalfHourlyCountsPerDay(DateTime date) {
-    final studyLog = extractLogForDuration(date, 1);
+  Future<List<int>> _getHalfHourlyCountsPerDay(DateTime date) async {
+    final studyLog = await _db.getEntries(date, 1);
     final result = List<int>.filled(48, 0);
     for (var log in studyLog) {
       final logDate = DateTime.parse(log[_keyTimestamp] as String);
@@ -124,22 +463,26 @@ class ActivityNotifier extends ChangeNotifier {
     return result;
   }
 
-  List<int> getDailyCountsPerWeek(DateTime date) {
-    final studyLog = extractLogForDuration(date, 7);
+  Future<List<int>> _getDailyCountsPerWeek(DateTime date) async {
+    final studyLog = await _db.getEntries(date, 7);
     final result = List<int>.filled(7, 0);
     for (var log in studyLog) {
       final logDate = DateTime.parse(log[_keyTimestamp] as String);
-      final weekday = logDate.weekday - 1;
-      result[weekday] += 1;
+      final weekday = logDate
+          .difference(DateTime(date.year, date.month, date.day))
+          .inDays;
+      if (weekday >= 0 && weekday < 7) {
+        result[weekday] += 1;
+      }
     }
     return result;
   }
 
-  List<int> getDailyCountsPerMonth(DateTime date) {
+  Future<List<int>> _getDailyCountsPerMonth(DateTime date) async {
     final firstDay = DateTime(date.year, date.month, 1);
     final duration = DateTime(date.year, date.month + 1, 0).day;
 
-    final studyLog = extractLogForDuration(firstDay, duration);
+    final studyLog = await _db.getEntries(firstDay, duration);
     final result = List<int>.filled(duration, 0);
     for (var log in studyLog) {
       final logDate = DateTime.parse(log[_keyTimestamp] as String);
@@ -196,15 +539,27 @@ class ActivityNotifier extends ChangeNotifier {
       if (entries.isNotEmpty) {
         final list = await _db.getAllEntries();
         final listWords = list.map((e) => e[_keyWord]).toList();
+        final newEntries = <Map<String, dynamic>>[];
+
         for (var entry in entries) {
           final elem = entry as Map<String, dynamic>;
           String? word = elem[_keyWord];
           String? timestamp = elem[_keyTimestamp];
           String? linkId = elem[_keyLinkId];
           if (word != null && timestamp != null && !listWords.contains(word)) {
-            addWord(word, timestamp: timestamp, linkId: linkId ?? '');
+            newEntries.add({
+              _keyWord: word,
+              _keyTimestamp: timestamp,
+              _keyLinkId: linkId ?? '',
+            });
+            _invalidateCacheForDate(DateTime.parse(timestamp));
             ++count;
           }
+        }
+
+        if (newEntries.isNotEmpty) {
+          await _db.batchInsert(newEntries);
+          await fetchLog(); // Refreshes everything once
         }
       }
 

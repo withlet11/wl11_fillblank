@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 abstract class BaseChartViewController<S extends BaseBarChartState> {
@@ -101,7 +102,7 @@ abstract class BaseBarChartState<
   }
 
   void _swipeLeft() {
-    if (_isAnimating || widget.nextData.isEmpty) return;
+    if (_isAnimating || widget.onSwipeLeft == null) return;
     _animateTo(-_lastWidth, widget.nextData, () {
       widget.onSwipeLeft?.call();
       setState(() {
@@ -111,7 +112,7 @@ abstract class BaseBarChartState<
   }
 
   void _swipeRight() {
-    if (_isAnimating || widget.previousData.isEmpty) return;
+    if (_isAnimating || widget.onSwipeRight == null) return;
     _animateTo(_lastWidth, widget.previousData, () {
       widget.onSwipeRight?.call();
       setState(() {
@@ -123,8 +124,8 @@ abstract class BaseBarChartState<
   void _onDragUpdate(DragUpdateDetails details) {
     if (_isAnimating ||
         _dragShift.abs() >= _lastWidth ||
-        (details.delta.dx > 0 && widget.previousData.isEmpty) ||
-        (details.delta.dx < 0 && widget.nextData.isEmpty)) {
+        (details.delta.dx > 0 && widget.onSwipeRight == null) ||
+        (details.delta.dx < 0 && widget.onSwipeLeft == null)) {
       return;
     }
 
@@ -524,9 +525,9 @@ abstract class BaseBarChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant BaseBarChartPainter oldDelegate) {
-    return oldDelegate.currentData != currentData ||
-        oldDelegate.previousData != previousData ||
-        oldDelegate.nextData != nextData ||
+    return !listEquals(oldDelegate.currentData, currentData) ||
+        !listEquals(oldDelegate.previousData, previousData) ||
+        !listEquals(oldDelegate.nextData, nextData) ||
         oldDelegate.shift != shift ||
         oldDelegate.barColor != barColor ||
         oldDelegate.textColor != textColor ||
