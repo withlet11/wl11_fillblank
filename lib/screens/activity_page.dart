@@ -7,6 +7,7 @@ import 'package:readblank/l10n/app_localizations.dart';
 
 import '../providers/activity_notifier.dart';
 import '../providers/app_preferences_notifier.dart';
+import '../providers/contents_notifier.dart';
 import '../views/daily_chart_view.dart';
 import '../views/monthly_chart_view.dart';
 import '../views/weekly_chart_view.dart';
@@ -21,6 +22,13 @@ class ActivityPage extends StatefulWidget {
 }
 
 class _ActivityPageState extends State<ActivityPage> {
+  static const String _keyCount = 'count';
+  static const String _keyLinkId = 'link_id';
+  static const String _keyLocale = 'locale';
+  static const String _keyTitle = 'title';
+  static const String _keyUrl = 'url';
+  static const String _keyWords = 'words';
+
   static final DateTime _startDate = DateTime(2026, 1, 1);
   final DailyChartViewController _dailyChartController =
       DailyChartViewController();
@@ -31,33 +39,38 @@ class _ActivityPageState extends State<ActivityPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ActivityNotifier>(
-      builder: (context, notifier, child) {
-        if (notifier.isLoading &&
-            notifier.wordLog.isEmpty &&
-            notifier.currentChartData.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return DefaultTabController(
+      length: 2,
+      child: Consumer2<ActivityNotifier, ContentsNotifier>(
+        builder: (context, notifier, contentsNotifier, child) {
+          if (notifier.isLoading &&
+              notifier.wordLog.isEmpty &&
+              notifier.currentChartData.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final view = notifier.viewMode == ActivityViewMode.daily
-            ? _buildDailyView(notifier)
-            : notifier.viewMode == ActivityViewMode.weekly
-            ? _buildWeeklyView(notifier)
-            : _buildMonthlyView(notifier);
+          final viewedContents = _getViewedContents(notifier, contentsNotifier);
 
-        return Stack(
-          children: [
-            view,
-            if (notifier.isLoading)
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: LinearProgressIndicator(minHeight: 2),
-              ),
-          ],
-        );
-      },
+          final view = notifier.viewMode == ActivityViewMode.daily
+              ? _buildDailyView(notifier, viewedContents)
+              : notifier.viewMode == ActivityViewMode.weekly
+              ? _buildWeeklyView(notifier, viewedContents)
+              : _buildMonthlyView(notifier, viewedContents);
+
+          return Stack(
+            children: [
+              view,
+              if (notifier.isLoading)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -162,7 +175,138 @@ class _ActivityPageState extends State<ActivityPage> {
     return _isBeforeStartDate(date) || _isAfterToday(date);
   }
 
-  Widget _buildDailyView(ActivityNotifier notifier) {
+  Widget _buildContentList(List<Map<String, dynamic>> contents) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return ListView.separated(
+      itemCount: contents.length,
+      itemBuilder: (context, index) {
+        final content = contents[index];
+        final title = content[_keyTitle] ?? l10n.noTitle;
+        final url = content[_keyUrl] ?? '';
+        final words = content[_keyWords] as List<String>? ?? [];
+        final count = content[_keyCount] as int? ?? 0;
+        final locale = content[_keyLocale] as String? ?? '';
+        final domain = Uri.tryParse(url)?.host.replaceFirst('www.', '') ?? '';
+
+        return ListTile(
+          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Text(
+            count.toString(),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (domain.isNotEmpty) Text('$domain [$locale]'),
+              if (words.isNotEmpty)
+                Text(
+                  words.join(', '),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        );
+      },
+      separatorBuilder: (context, index) {
+        return const Divider(height: 1, thickness: 1);
+      },
+    );
+  }
+
+  Widget _buildWordList(List<WordSummary> entries) {
+    return ListView.separated(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return ListTile(
+          title: Text(entry.word, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Text(
+            entry.count.toString(),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        );
+      },
+      separatorBuilder: (context, index) {
+        return const Divider(height: 1, thickness: 1);
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _getViewedContents(
+    ActivityNotifier activityNotifier,
+    ContentsNotifier contentsNotifier,
+  ) {
+    final linkIds = activityNotifier.currentWordCounts
+        .expand((summary) => summary.linkIds)
+        .toSet();
+
+    return linkIds.map((id) {
+      final matchingSummaries = activityNotifier.currentWordCounts.where(
+        (s) => s.linkIds.contains(id),
+      );
+
+      final words = matchingSummaries.map((s) => s.word).toList()..sort();
+
+      final count = matchingSummaries.fold(0, (sum, s) {
+        return sum + s.linkIds.where((lid) => lid == id).length;
+      });
+
+      final content = contentsNotifier.linkList.firstWhere(
+        (c) => c[_keyLinkId] == id,
+        orElse: () => {
+          _keyLinkId: id,
+          _keyTitle: 'Unknown Content',
+          _keyUrl: '',
+        },
+      );
+
+      return {...content, _keyWords: words, _keyCount: count};
+    }).toList();
+  }
+
+  Widget _buildTabbedWordList(
+    List<WordSummary> entries,
+    List<Map<String, dynamic>> viewedContents,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    return Expanded(
+      child: Column(
+        children: [
+          TabBar(
+            labelStyle: Theme.of(context).textTheme.bodySmall,
+            tabs: [
+              Tab(
+                text: l10n.contentsViewedLabel,
+                icon: const Icon(Icons.library_books_outlined),
+              ),
+              Tab(
+                text: l10n.wordsEncounteredLabel,
+                icon: const Icon(Icons.abc_outlined),
+              ),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildContentList(viewedContents),
+                _buildWordList(entries),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyView(
+    ActivityNotifier notifier,
+    List<Map<String, dynamic>> viewedContents,
+  ) {
     final l10n = AppLocalizations.of(context)!;
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
@@ -189,7 +333,7 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: Icon(Icons.keyboard_arrow_left),
+                  icon: const Icon(Icons.keyboard_arrow_left),
                   onPressed: _isOnOrBeforeStartDate(selectedDate)
                       ? null
                       : () {
@@ -201,7 +345,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 IconButton(
-                  icon: Icon(Icons.keyboard_arrow_right),
+                  icon: const Icon(Icons.keyboard_arrow_right),
                   onPressed: _isOnOrAfterToday(selectedDate)
                       ? null
                       : () {
@@ -213,7 +357,7 @@ class _ActivityPageState extends State<ActivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.abc),
+                const Icon(Icons.abc_outlined),
                 Text(l10n.wordCount(notifier.currentCount)),
               ],
             ),
@@ -238,34 +382,9 @@ class _ActivityPageState extends State<ActivityPage> {
             ),
             SizedBox(height: 16),
             Divider(height: 1),
-            Text(
-              'Read Words',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
           ],
         ),
-        Expanded(
-          child: ListView.separated(
-            itemCount: entries.length,
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return ListTile(
-                title: Text(
-                  entry.key,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  entry.value.toString(),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              );
-            },
-            separatorBuilder: (context, index) {
-              return const Divider(height: 1, thickness: 1);
-            },
-          ),
-        ),
+        _buildTabbedWordList(entries, viewedContents),
       ],
     );
   }
@@ -281,7 +400,10 @@ class _ActivityPageState extends State<ActivityPage> {
         : l10n.dateFormatForWeeklyChart)(startDay, endDay);
   }
 
-  Widget _buildWeeklyView(ActivityNotifier notifier) {
+  Widget _buildWeeklyView(
+    ActivityNotifier notifier,
+    List<Map<String, dynamic>> viewedContents,
+  ) {
     final l10n = AppLocalizations.of(context)!;
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
@@ -308,7 +430,7 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: Icon(Icons.keyboard_arrow_left),
+                  icon: const Icon(Icons.keyboard_arrow_left),
                   onPressed: _isInOrBeforeStartWeek(selectedDate)
                       ? null
                       : () {
@@ -326,7 +448,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.keyboard_arrow_right),
+                  icon: const Icon(Icons.keyboard_arrow_right),
                   onPressed: _isInOrAfterThisWeek(selectedDate)
                       ? null
                       : () {
@@ -340,7 +462,7 @@ class _ActivityPageState extends State<ActivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.abc),
+                const Icon(Icons.abc_outlined),
                 Text(l10n.wordCount(notifier.currentCount)),
               ],
             ),
@@ -375,39 +497,17 @@ class _ActivityPageState extends State<ActivityPage> {
             ),
             SizedBox(height: 16),
             Divider(height: 1),
-            Text(
-              'Read Words',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
           ],
         ),
-        Expanded(
-          child: ListView.separated(
-            itemCount: entries.length,
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return ListTile(
-                title: Text(
-                  entry.key,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  entry.value.toString(),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              );
-            },
-            separatorBuilder: (context, index) {
-              return const Divider(height: 1, thickness: 1);
-            },
-          ),
-        ),
+        _buildTabbedWordList(entries, viewedContents),
       ],
     );
   }
 
-  Widget _buildMonthlyView(ActivityNotifier notifier) {
+  Widget _buildMonthlyView(
+    ActivityNotifier notifier,
+    List<Map<String, dynamic>> viewedContents,
+  ) {
     final l10n = AppLocalizations.of(context)!;
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
@@ -428,7 +528,7 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: Icon(Icons.keyboard_arrow_left),
+                  icon: const Icon(Icons.keyboard_arrow_left),
                   onPressed: _isInOrBeforeStartMonth(selectedDate)
                       ? null
                       : () {
@@ -443,7 +543,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.keyboard_arrow_right),
+                  icon: const Icon(Icons.keyboard_arrow_right),
                   onPressed: _isInOrAfterThisMonth(selectedDate)
                       ? null
                       : () {
@@ -457,7 +557,7 @@ class _ActivityPageState extends State<ActivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.abc),
+                const Icon(Icons.abc_outlined),
                 Text(l10n.wordCount(notifier.currentCount)),
               ],
             ),
@@ -500,34 +600,9 @@ class _ActivityPageState extends State<ActivityPage> {
             ),
             SizedBox(height: 16),
             Divider(height: 1),
-            Text(
-              'Read Words',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
           ],
         ),
-        Expanded(
-          child: ListView.separated(
-            itemCount: entries.length,
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return ListTile(
-                title: Text(
-                  entry.key,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  entry.value.toString(),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              );
-            },
-            separatorBuilder: (context, index) {
-              return const Divider(height: 1, thickness: 1);
-            },
-          ),
-        ),
+        _buildTabbedWordList(entries, viewedContents),
       ],
     );
   }

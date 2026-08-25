@@ -1,5 +1,7 @@
 {
   "@@locale": "en",
+  "contentsViewedLabel": "Contents Viewed",
+  "wordsEncounteredLabel": "Words Encountered",
   "activityBackupCancelledMessage": "Activity backup cancelled.",
   "activityBackupCompletedMessage": "Activity backup completed.",
   "activityBackupLabel": "Backup Activity",

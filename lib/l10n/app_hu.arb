@@ -1,5 +1,7 @@
 {
   "@@locale": "hu",
+  "contentsViewedLabel": "Megtekintett tartalmak",
+  "wordsEncounteredLabel": "Előforduló szavak",
   "activityBackupCancelledMessage": "A tevékenység biztonsági mentése megszakítva.",
   "activityBackupCompletedMessage": "A tevékenység biztonsági mentése elkészült.",
   "activityBackupLabel": "Tevékenység biztonsági mentése",

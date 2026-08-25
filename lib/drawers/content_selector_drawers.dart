@@ -25,32 +25,6 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
   static const String _keyTimestamp = 'timestamp';
   static const String _keyIsFavorite = 'isFavorite';
 
-  late TabController _tabController;
-  int _activeIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_handleTabSelection);
-  }
-
-  void _handleTabSelection() {
-    if (_tabController.indexIsChanging ||
-        _tabController.index != _activeIndex) {
-      setState(() {
-        _activeIndex = _tabController.index;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _tabController.removeListener(_handleTabSelection);
-    _tabController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;

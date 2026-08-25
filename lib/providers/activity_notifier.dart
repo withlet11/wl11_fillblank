@@ -11,6 +11,18 @@ import 'package:sqflite/sqflite.dart';
 
 enum ActivityViewMode { daily, weekly, monthly }
 
+class WordSummary {
+  final String word;
+  final int count;
+  final List<String> linkIds;
+
+  WordSummary({
+    required this.word,
+    required this.count,
+    required this.linkIds,
+  });
+}
+
 class ActivityNotifier extends ChangeNotifier {
   static const String _appId = 'io.github.withlet11.readblank';
   static const String _keyActivity = 'activity';
@@ -40,9 +52,9 @@ class ActivityNotifier extends ChangeNotifier {
   List<int> _currentChartData = List<int>.filled(48, 0);
   List<int> _previousChartData = List<int>.filled(48, 0);
   List<int> _nextChartData = List<int>.filled(48, 0);
-  List<MapEntry<String, int>> _currentWordCounts = [];
-  List<MapEntry<String, int>> _previousWordCounts = [];
-  List<MapEntry<String, int>> _nextWordCounts = [];
+  List<WordSummary> _currentWordCounts = [];
+  List<WordSummary> _previousWordCounts = [];
+  List<WordSummary> _nextWordCounts = [];
   int _currentCount = 0;
 
   ActivityViewMode? _lastFetchedMode;
@@ -50,12 +62,12 @@ class ActivityNotifier extends ChangeNotifier {
 
   // Cache
   final Map<String, List<int>> _chartCache = {};
-  final Map<String, List<MapEntry<String, int>>> _wordCountsCache = {};
+  final Map<String, List<WordSummary>> _wordCountsCache = {};
   final Map<String, int> _totalCountCache = {};
 
   ActivityNotifier() {
     _initSkeletons();
-    refreshData();
+    fetchLog();
   }
 
   void _initSkeletons() {
@@ -100,7 +112,7 @@ class ActivityNotifier extends ChangeNotifier {
 
   List<int> get nextChartData => _nextChartData;
 
-  List<MapEntry<String, int>> get currentWordCounts => _currentWordCounts;
+  List<WordSummary> get currentWordCounts => _currentWordCounts;
 
   int get currentCount => _currentCount;
 
@@ -130,12 +142,16 @@ class ActivityNotifier extends ChangeNotifier {
   }
 
   bool _isWordCountsEqual(
-    List<MapEntry<String, int>> a,
-    List<MapEntry<String, int>> b,
+    List<WordSummary> a,
+    List<WordSummary> b,
   ) {
     if (a.length != b.length) return false;
     for (int i = 0; i < a.length; i++) {
-      if (a[i].key != b[i].key || a[i].value != b[i].value) return false;
+      if (a[i].word != b[i].word || a[i].count != b[i].count) return false;
+      if (a[i].linkIds.length != b[i].linkIds.length) return false;
+      for (int j = 0; j < a[i].linkIds.length; j++) {
+        if (a[i].linkIds[j] != b[i].linkIds[j]) return false;
+      }
     }
     return true;
   }
@@ -189,7 +205,7 @@ class ActivityNotifier extends ChangeNotifier {
     if (promoted) {
       _currentCount = _currentWordCounts.fold(
         0,
-        (sum, entry) => sum + entry.value,
+        (sum, entry) => sum + entry.count,
       );
       _isLoading = false;
     } else if (isCached) {
@@ -197,7 +213,7 @@ class ActivityNotifier extends ChangeNotifier {
       _currentWordCounts = cachedWordCounts;
       _currentCount = _currentWordCounts.fold(
         0,
-        (sum, entry) => sum + entry.value,
+        (sum, entry) => sum + entry.count,
       );
       final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
       final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
@@ -246,9 +262,9 @@ class ActivityNotifier extends ChangeNotifier {
       final newCurrentChart = results[0] as List<int>;
       final newPrevChart = results[1] as List<int>;
       final newNextChart = results[2] as List<int>;
-      final newWordCounts = results[3] as List<MapEntry<String, int>>;
-      final newPrevWordCounts = results[4] as List<MapEntry<String, int>>;
-      final newNextWordCounts = results[5] as List<MapEntry<String, int>>;
+      final newWordCounts = results[3] as List<WordSummary>;
+      final newPrevWordCounts = results[4] as List<WordSummary>;
+      final newNextWordCounts = results[5] as List<WordSummary>;
 
       bool dataUpdated = false;
       if (!listEquals(_currentChartData, newCurrentChart)) {
@@ -267,7 +283,7 @@ class ActivityNotifier extends ChangeNotifier {
         _currentWordCounts = newWordCounts;
         _currentCount = _currentWordCounts.fold(
           0,
-          (sum, entry) => sum + entry.value,
+          (sum, entry) => sum + entry.count,
         );
         dataUpdated = true;
       }
@@ -341,14 +357,14 @@ class ActivityNotifier extends ChangeNotifier {
     return data;
   }
 
-  Future<List<MapEntry<String, int>>> _getWordCounts(
+  Future<List<WordSummary>> _getWordCounts(
     ActivityViewMode mode,
     DateTime date,
   ) async {
     final key = _getCacheKey(mode, date);
     if (_wordCountsCache.containsKey(key)) return _wordCountsCache[key]!;
 
-    List<MapEntry<String, int>> data;
+    List<WordSummary> data;
     switch (mode) {
       case ActivityViewMode.daily:
         data = await _getWordCountsForDuration(date, 1);
@@ -435,19 +451,25 @@ class ActivityNotifier extends ChangeNotifier {
       _keyTimestamp: timestamp,
       _keyLinkId: linkId,
     });
-    if (_wordLog.length > 10000) _wordLog.removeLast();
+    if (_wordLog.length > 20000) _wordLog.removeLast();
 
     _invalidateCacheForDate(DateTime.parse(timestamp));
     await refreshData();
   }
 
-  Future<List<MapEntry<String, int>>> _getWordCountsForDuration(
+  Future<List<WordSummary>> _getWordCountsForDuration(
     DateTime date,
     int duration,
   ) async {
     final log = await _db.getSummaryList(date, duration);
     return log.map((e) {
-      return MapEntry(e[_keyWord] as String, e['count'] as int);
+      final linkIdsStr = e['link_ids'] as String? ?? '';
+      final linkIds = linkIdsStr.split(',').where((s) => s.isNotEmpty).toList();
+      return WordSummary(
+        word: e[_keyWord] as String,
+        count: e['count'] as int,
+        linkIds: linkIds,
+      );
     }).toList();
   }
 
@@ -710,7 +732,7 @@ class DatabaseHelper {
     ).add(Duration(days: duration)).toIso8601String();
     return await db.rawQuery(
       '''
-      SELECT LOWER(word) as word, COUNT(*) as count 
+      SELECT LOWER(word) as word, COUNT(*) as count, GROUP_CONCAT(link_id) as link_ids
       FROM logs 
       WHERE timestamp >= ? AND timestamp < ?
       GROUP BY LOWER(word) 

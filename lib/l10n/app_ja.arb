@@ -1,5 +1,7 @@
 {
   "@@locale": "ja",
+  "contentsViewedLabel": "閲覧コンテンツ",
+  "wordsEncounteredLabel": "出現単語",
   "activityBackupCancelledMessage": "アクティビティのバックアップをキャンセルしました。",
   "activityBackupCompletedMessage": "アクティビティのバックアップを完了しました。",
   "activityBackupLabel": "アクティビティをバックアップ",
