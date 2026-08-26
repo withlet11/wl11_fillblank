@@ -42,25 +42,40 @@ class _ActivityPageState extends State<ActivityPage> {
     return DefaultTabController(
       length: 2,
       child: Consumer2<ActivityNotifier, ContentsNotifier>(
-        builder: (context, notifier, contentsNotifier, child) {
-          if (notifier.isLoading &&
-              notifier.wordLog.isEmpty &&
-              notifier.currentChartData.isEmpty) {
+        builder: (context, activityNotifier, contentsNotifier, child) {
+          if (activityNotifier.isLoading &&
+              activityNotifier.wordLog.isEmpty &&
+              activityNotifier.currentChartData.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final viewedContents = _getViewedContents(notifier, contentsNotifier);
+          final viewedContents = _getViewedContents(
+            activityNotifier,
+            contentsNotifier,
+          );
 
-          final view = notifier.viewMode == ActivityViewMode.daily
-              ? _buildDailyView(notifier, viewedContents)
-              : notifier.viewMode == ActivityViewMode.weekly
-              ? _buildWeeklyView(notifier, viewedContents)
-              : _buildMonthlyView(notifier, viewedContents);
+          final view = activityNotifier.viewMode == ActivityViewMode.daily
+              ? _buildDailyView(
+                  activityNotifier,
+                  contentsNotifier,
+                  viewedContents,
+                )
+              : activityNotifier.viewMode == ActivityViewMode.weekly
+              ? _buildWeeklyView(
+                  activityNotifier,
+                  contentsNotifier,
+                  viewedContents,
+                )
+              : _buildMonthlyView(
+                  activityNotifier,
+                  contentsNotifier,
+                  viewedContents,
+                );
 
           return Stack(
             children: [
               view,
-              if (notifier.isLoading)
+              if (activityNotifier.isLoading)
                 const Positioned(
                   top: 0,
                   left: 0,
@@ -190,7 +205,7 @@ class _ActivityPageState extends State<ActivityPage> {
         final domain = Uri.tryParse(url)?.host.replaceFirst('www.', '') ?? '';
 
         return ListTile(
-          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
           trailing: Text(
             count.toString(),
             style: Theme.of(context).textTheme.bodyMedium,
@@ -205,7 +220,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.secondary,
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -218,17 +233,45 @@ class _ActivityPageState extends State<ActivityPage> {
     );
   }
 
-  Widget _buildWordList(List<WordSummary> entries) {
+  Widget _buildWordList(
+    String keyString,
+    List<WordSummary> entries,
+    ContentsNotifier contentsNotifier,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+
     return ListView.separated(
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
-        return ListTile(
+        final uniqueLinkIds = entry.linkIds.toSet().toList();
+        final linkedContents = uniqueLinkIds.map((id) {
+          return contentsNotifier.linkList.firstWhere(
+            (c) => c[_keyLinkId] == id,
+            orElse: () => {_keyLinkId: id, _keyTitle: l10n.noTitle},
+          );
+        }).toList();
+
+        return ExpansionTile(
+          key: PageStorageKey('${keyString}_${entry.word}'),
+          controlAffinity: ListTileControlAffinity.leading,
           title: Text(entry.word, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: Text(
             entry.count.toString(),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          children: linkedContents.map((content) {
+            final title = content[_keyTitle] ?? l10n.noTitle;
+            final url = content[_keyUrl] ?? '';
+            final domain =
+                Uri.tryParse(url)?.host.replaceFirst('www.', '') ?? '';
+            final locale = content[_keyLocale] as String? ?? '';
+
+            return ListTile(
+              title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+              subtitle: domain.isNotEmpty ? Text('$domain [$locale]') : null,
+            );
+          }).toList(),
         );
       },
       separatorBuilder: (context, index) {
@@ -241,12 +284,13 @@ class _ActivityPageState extends State<ActivityPage> {
     ActivityNotifier activityNotifier,
     ContentsNotifier contentsNotifier,
   ) {
-    final linkIds = activityNotifier.currentWordCounts
+    final l10n = AppLocalizations.of(context)!;
+    final linkIds = activityNotifier.currentWordEntries
         .expand((summary) => summary.linkIds)
         .toSet();
 
     return linkIds.map((id) {
-      final matchingSummaries = activityNotifier.currentWordCounts.where(
+      final matchingSummaries = activityNotifier.currentWordEntries.where(
         (s) => s.linkIds.contains(id),
       );
 
@@ -258,11 +302,7 @@ class _ActivityPageState extends State<ActivityPage> {
 
       final content = contentsNotifier.linkList.firstWhere(
         (c) => c[_keyLinkId] == id,
-        orElse: () => {
-          _keyLinkId: id,
-          _keyTitle: 'Unknown Content',
-          _keyUrl: '',
-        },
+        orElse: () => {_keyLinkId: id, _keyTitle: l10n.noTitle, _keyUrl: ''},
       );
 
       return {...content, _keyWords: words, _keyCount: count};
@@ -270,10 +310,13 @@ class _ActivityPageState extends State<ActivityPage> {
   }
 
   Widget _buildTabbedWordList(
+    String keyString,
     List<WordSummary> entries,
+    ContentsNotifier contentsNotifier,
     List<Map<String, dynamic>> viewedContents,
   ) {
     final l10n = AppLocalizations.of(context)!;
+
     return Expanded(
       child: Column(
         children: [
@@ -294,7 +337,7 @@ class _ActivityPageState extends State<ActivityPage> {
             child: TabBarView(
               children: [
                 _buildContentList(viewedContents),
-                _buildWordList(entries),
+                _buildWordList(keyString, entries, contentsNotifier),
               ],
             ),
           ),
@@ -304,26 +347,27 @@ class _ActivityPageState extends State<ActivityPage> {
   }
 
   Widget _buildDailyView(
-    ActivityNotifier notifier,
+    ActivityNotifier activityNotifier,
+    ContentsNotifier contentsNotifier,
     List<Map<String, dynamic>> viewedContents,
   ) {
     final l10n = AppLocalizations.of(context)!;
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
         .fontSizeFactor;
-    final selectedDate = notifier.selectedDate;
+    final selectedDate = activityNotifier.selectedDate;
 
     if (_isBeforeStartDate(selectedDate)) {
-      notifier.selectedDate = _startDate;
+      activityNotifier.selectedDate = _startDate;
     } else if (_isAfterToday(selectedDate)) {
-      notifier.selectedDate = today;
+      activityNotifier.selectedDate = today;
     }
 
-    final currentData = notifier.currentChartData;
-    final previousData = notifier.previousChartData;
-    final nextData = notifier.nextChartData;
+    final currentData = activityNotifier.currentChartData;
+    final previousData = activityNotifier.previousChartData;
+    final nextData = activityNotifier.nextChartData;
 
-    final entries = notifier.currentWordCounts;
+    final entries = activityNotifier.currentWordEntries;
 
     return Column(
       children: [
@@ -337,7 +381,9 @@ class _ActivityPageState extends State<ActivityPage> {
                   onPressed: _isOnOrBeforeStartDate(selectedDate)
                       ? null
                       : () {
-                          notifier.selectedDate = _getOneDayAgo(selectedDate);
+                          activityNotifier.selectedDate = _getOneDayAgo(
+                            selectedDate,
+                          );
                         },
                 ),
                 Text(
@@ -349,7 +395,9 @@ class _ActivityPageState extends State<ActivityPage> {
                   onPressed: _isOnOrAfterToday(selectedDate)
                       ? null
                       : () {
-                          notifier.selectedDate = _getOneDayLater(selectedDate);
+                          activityNotifier.selectedDate = _getOneDayLater(
+                            selectedDate,
+                          );
                         },
                 ),
               ],
@@ -358,10 +406,11 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.abc_outlined),
-                Text(l10n.wordCount(notifier.currentCount)),
+                Text(l10n.wordCount(activityNotifier.currentCount)),
               ],
             ),
             DailyChartView(
+              key: UniqueKey(),
               controller: _dailyChartController,
               currentData: currentData,
               previousData: previousData,
@@ -372,19 +421,28 @@ class _ActivityPageState extends State<ActivityPage> {
               onSwipeLeft: _isOnOrAfterToday(selectedDate)
                   ? null
                   : () {
-                      notifier.selectedDate = _getOneDayLater(selectedDate);
+                      activityNotifier.selectedDate = _getOneDayLater(
+                        selectedDate,
+                      );
                     },
               onSwipeRight: _isOnOrBeforeStartDate(selectedDate)
                   ? null
                   : () {
-                      notifier.selectedDate = _getOneDayAgo(selectedDate);
+                      activityNotifier.selectedDate = _getOneDayAgo(
+                        selectedDate,
+                      );
                     },
             ),
             SizedBox(height: 16),
             Divider(height: 1),
           ],
         ),
-        _buildTabbedWordList(entries, viewedContents),
+        _buildTabbedWordList(
+          'Daily_$selectedDate',
+          entries,
+          contentsNotifier,
+          viewedContents,
+        ),
       ],
     );
   }
@@ -401,26 +459,27 @@ class _ActivityPageState extends State<ActivityPage> {
   }
 
   Widget _buildWeeklyView(
-    ActivityNotifier notifier,
+    ActivityNotifier activityNotifier,
+    ContentsNotifier contentsNotifier,
     List<Map<String, dynamic>> viewedContents,
   ) {
     final l10n = AppLocalizations.of(context)!;
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
         .fontSizeFactor;
-    final selectedDate = notifier.selectedDate;
+    final selectedDate = activityNotifier.selectedDate;
 
     if (_isBeforeStartWeek(selectedDate)) {
-      notifier.selectedDate = _startDate;
+      activityNotifier.selectedDate = _startDate;
     } else if (_isAfterThisWeek(selectedDate)) {
-      notifier.selectedDate = today;
+      activityNotifier.selectedDate = today;
     }
 
-    final currentData = notifier.currentChartData;
-    final previousData = notifier.previousChartData;
-    final nextData = notifier.nextChartData;
+    final currentData = activityNotifier.currentChartData;
+    final previousData = activityNotifier.previousChartData;
+    final nextData = activityNotifier.nextChartData;
 
-    final entries = notifier.currentWordCounts;
+    final entries = activityNotifier.currentWordEntries;
 
     return Column(
       children: [
@@ -434,7 +493,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   onPressed: _isInOrBeforeStartWeek(selectedDate)
                       ? null
                       : () {
-                          notifier.selectedDate = _getSevenDaysAgo(
+                          activityNotifier.selectedDate = _getSevenDaysAgo(
                             selectedDate,
                           );
                         },
@@ -452,7 +511,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   onPressed: _isInOrAfterThisWeek(selectedDate)
                       ? null
                       : () {
-                          notifier.selectedDate = _getSevenDaysLater(
+                          activityNotifier.selectedDate = _getSevenDaysLater(
                             selectedDate,
                           );
                         },
@@ -463,10 +522,11 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.abc_outlined),
-                Text(l10n.wordCount(notifier.currentCount)),
+                Text(l10n.wordCount(activityNotifier.currentCount)),
               ],
             ),
             WeeklyChartView(
+              key: UniqueKey(),
               controller: _weeklyChartController,
               currentData: currentData,
               previousData: previousData,
@@ -477,12 +537,16 @@ class _ActivityPageState extends State<ActivityPage> {
               onSwipeLeft: _isInOrAfterThisWeek(selectedDate)
                   ? null
                   : () {
-                      notifier.selectedDate = _getSevenDaysLater(selectedDate);
+                      activityNotifier.selectedDate = _getSevenDaysLater(
+                        selectedDate,
+                      );
                     },
               onSwipeRight: _isInOrBeforeStartWeek(selectedDate)
                   ? null
                   : () {
-                      notifier.selectedDate = _getSevenDaysAgo(selectedDate);
+                      activityNotifier.selectedDate = _getSevenDaysAgo(
+                        selectedDate,
+                      );
                     },
               onDailyViewSelected: (int index) {
                 final tappedDate = _getStartDayOfWeek(
@@ -491,34 +555,40 @@ class _ActivityPageState extends State<ActivityPage> {
 
                 if (_isNotInRange(tappedDate)) return;
 
-                notifier.selectedDate = tappedDate;
-                notifier.viewMode = ActivityViewMode.daily;
+                activityNotifier.selectedDate = tappedDate;
+                activityNotifier.viewMode = ActivityViewMode.daily;
               },
             ),
             SizedBox(height: 16),
             Divider(height: 1),
           ],
         ),
-        _buildTabbedWordList(entries, viewedContents),
+        _buildTabbedWordList(
+          'Weekly_$selectedDate',
+          entries,
+          contentsNotifier,
+          viewedContents,
+        ),
       ],
     );
   }
 
   Widget _buildMonthlyView(
-    ActivityNotifier notifier,
+    ActivityNotifier activityNotifier,
+    ContentsNotifier contentsNotifier,
     List<Map<String, dynamic>> viewedContents,
   ) {
     final l10n = AppLocalizations.of(context)!;
     final fontSizeFactor = context
         .watch<AppPreferencesNotifier>()
         .fontSizeFactor;
-    final selectedDate = notifier.selectedDate;
+    final selectedDate = activityNotifier.selectedDate;
 
-    final currentData = notifier.currentChartData;
-    final previousData = notifier.previousChartData;
-    final nextData = notifier.nextChartData;
+    final currentData = activityNotifier.currentChartData;
+    final previousData = activityNotifier.previousChartData;
+    final nextData = activityNotifier.nextChartData;
 
-    final entries = notifier.currentWordCounts;
+    final entries = activityNotifier.currentWordEntries;
 
     return Column(
       children: [
@@ -532,7 +602,9 @@ class _ActivityPageState extends State<ActivityPage> {
                   onPressed: _isInOrBeforeStartMonth(selectedDate)
                       ? null
                       : () {
-                          notifier.selectedDate = _getOneMonthAgo(selectedDate);
+                          activityNotifier.selectedDate = _getOneMonthAgo(
+                            selectedDate,
+                          );
                         },
                 ),
                 Expanded(
@@ -547,7 +619,7 @@ class _ActivityPageState extends State<ActivityPage> {
                   onPressed: _isInOrAfterThisMonth(selectedDate)
                       ? null
                       : () {
-                          notifier.selectedDate = _getOneMonthLater(
+                          activityNotifier.selectedDate = _getOneMonthLater(
                             selectedDate,
                           );
                         },
@@ -558,10 +630,11 @@ class _ActivityPageState extends State<ActivityPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.abc_outlined),
-                Text(l10n.wordCount(notifier.currentCount)),
+                Text(l10n.wordCount(activityNotifier.currentCount)),
               ],
             ),
             MonthlyChartView(
+              key: UniqueKey(),
               controller: _monthlyChartController,
               currentData: currentData,
               previousData: previousData,
@@ -573,12 +646,16 @@ class _ActivityPageState extends State<ActivityPage> {
               onSwipeLeft: _isInOrAfterThisMonth(selectedDate)
                   ? null
                   : () {
-                      notifier.selectedDate = _getOneMonthLater(selectedDate);
+                      activityNotifier.selectedDate = _getOneMonthLater(
+                        selectedDate,
+                      );
                     },
               onSwipeRight: _isInOrBeforeStartMonth(selectedDate)
                   ? null
                   : () {
-                      notifier.selectedDate = _getOneMonthAgo(selectedDate);
+                      activityNotifier.selectedDate = _getOneMonthAgo(
+                        selectedDate,
+                      );
                     },
               onDailyViewSelected: (int index) {
                 final startOffset =
@@ -594,15 +671,20 @@ class _ActivityPageState extends State<ActivityPage> {
                   return;
                 }
 
-                notifier.selectedDate = tappedDate;
-                notifier.viewMode = ActivityViewMode.daily;
+                activityNotifier.selectedDate = tappedDate;
+                activityNotifier.viewMode = ActivityViewMode.daily;
               },
             ),
             SizedBox(height: 16),
             Divider(height: 1),
           ],
         ),
-        _buildTabbedWordList(entries, viewedContents),
+        _buildTabbedWordList(
+          'Monthly_$selectedDate',
+          entries,
+          contentsNotifier,
+          viewedContents,
+        ),
       ],
     );
   }

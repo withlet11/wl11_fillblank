@@ -16,11 +16,7 @@ class WordSummary {
   final int count;
   final List<String> linkIds;
 
-  WordSummary({
-    required this.word,
-    required this.count,
-    required this.linkIds,
-  });
+  WordSummary({required this.word, required this.count, required this.linkIds});
 }
 
 class ActivityNotifier extends ChangeNotifier {
@@ -52,9 +48,9 @@ class ActivityNotifier extends ChangeNotifier {
   List<int> _currentChartData = List<int>.filled(48, 0);
   List<int> _previousChartData = List<int>.filled(48, 0);
   List<int> _nextChartData = List<int>.filled(48, 0);
-  List<WordSummary> _currentWordCounts = [];
-  List<WordSummary> _previousWordCounts = [];
-  List<WordSummary> _nextWordCounts = [];
+  List<WordSummary> _currentWordEntries = [];
+  List<WordSummary> _previousWordEntries = [];
+  List<WordSummary> _nextWordEntries = [];
   int _currentCount = 0;
 
   ActivityViewMode? _lastFetchedMode;
@@ -62,7 +58,7 @@ class ActivityNotifier extends ChangeNotifier {
 
   // Cache
   final Map<String, List<int>> _chartCache = {};
-  final Map<String, List<WordSummary>> _wordCountsCache = {};
+  final Map<String, List<WordSummary>> _entriesCache = {};
   final Map<String, int> _totalCountCache = {};
 
   ActivityNotifier() {
@@ -112,7 +108,7 @@ class ActivityNotifier extends ChangeNotifier {
 
   List<int> get nextChartData => _nextChartData;
 
-  List<WordSummary> get currentWordCounts => _currentWordCounts;
+  List<WordSummary> get currentWordEntries => _currentWordEntries;
 
   int get currentCount => _currentCount;
 
@@ -141,10 +137,7 @@ class ActivityNotifier extends ChangeNotifier {
     }
   }
 
-  bool _isWordCountsEqual(
-    List<WordSummary> a,
-    List<WordSummary> b,
-  ) {
+  bool _isWordEntriesEqual(List<WordSummary> a, List<WordSummary> b) {
     if (a.length != b.length) return false;
     for (int i = 0; i < a.length; i++) {
       if (a[i].word != b[i].word || a[i].count != b[i].count) return false;
@@ -172,46 +165,46 @@ class ActivityNotifier extends ChangeNotifier {
       )) {
         // Moved to previous
         _nextChartData = _currentChartData;
-        _nextWordCounts = _currentWordCounts;
+        _nextWordEntries = _currentWordEntries;
         _currentChartData = _previousChartData;
-        _currentWordCounts = _previousWordCounts;
+        _currentWordEntries = _previousWordEntries;
         final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
         final prevKey = _getCacheKey(_viewMode, prevDate);
         _previousChartData =
             _chartCache[prevKey] ?? _getSkeleton(_viewMode, prevDate);
-        _previousWordCounts = _wordCountsCache[prevKey] ?? [];
+        _previousWordEntries = _entriesCache[prevKey] ?? [];
         promoted = true;
       } else if (_selectedDate.isAtSameMomentAs(
         _getNextPeriodDate(_viewMode, oldDate),
       )) {
         // Moved to next
         _previousChartData = _currentChartData;
-        _previousWordCounts = _currentWordCounts;
+        _previousWordEntries = _currentWordEntries;
         _currentChartData = _nextChartData;
-        _currentWordCounts = _nextWordCounts;
+        _currentWordEntries = _nextWordEntries;
         final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
         final nextKey = _getCacheKey(_viewMode, nextDate);
         _nextChartData =
             _chartCache[nextKey] ?? _getSkeleton(_viewMode, nextDate);
-        _nextWordCounts = _wordCountsCache[nextKey] ?? [];
+        _nextWordEntries = _entriesCache[nextKey] ?? [];
         promoted = true;
       }
     }
 
     final cachedChart = _chartCache[key];
-    final cachedWordCounts = _wordCountsCache[key];
-    final isCached = cachedChart != null && cachedWordCounts != null;
+    final cachedWordEntries = _entriesCache[key];
+    final isCached = cachedChart != null && cachedWordEntries != null;
 
     if (promoted) {
-      _currentCount = _currentWordCounts.fold(
+      _currentCount = _currentWordEntries.fold(
         0,
         (sum, entry) => sum + entry.count,
       );
       _isLoading = false;
     } else if (isCached) {
       _currentChartData = cachedChart;
-      _currentWordCounts = cachedWordCounts;
-      _currentCount = _currentWordCounts.fold(
+      _currentWordEntries = cachedWordEntries;
+      _currentCount = _currentWordEntries.fold(
         0,
         (sum, entry) => sum + entry.count,
       );
@@ -226,7 +219,7 @@ class ActivityNotifier extends ChangeNotifier {
       _isLoading = false;
     } else {
       _currentChartData = _getSkeleton(_viewMode, _selectedDate);
-      _currentWordCounts = [];
+      _currentWordEntries = [];
       _currentCount = 0;
       final prevDate = _getPreviousPeriodDate(_viewMode, _selectedDate);
       final nextDate = _getNextPeriodDate(_viewMode, _selectedDate);
@@ -236,8 +229,8 @@ class ActivityNotifier extends ChangeNotifier {
           _chartCache[prevKey] ?? _getSkeleton(_viewMode, prevDate);
       _nextChartData =
           _chartCache[nextKey] ?? _getSkeleton(_viewMode, nextDate);
-      _previousWordCounts = _wordCountsCache[prevKey] ?? [];
-      _nextWordCounts = _wordCountsCache[nextKey] ?? [];
+      _previousWordEntries = _entriesCache[prevKey] ?? [];
+      _nextWordEntries = _entriesCache[nextKey] ?? [];
       _isLoading = true;
     }
 
@@ -252,9 +245,9 @@ class ActivityNotifier extends ChangeNotifier {
         _getChartData(_viewMode, _selectedDate),
         _getChartData(_viewMode, prevDate),
         _getChartData(_viewMode, nextDate),
-        _getWordCounts(_viewMode, _selectedDate),
-        _getWordCounts(_viewMode, prevDate),
-        _getWordCounts(_viewMode, nextDate),
+        _getWordEntries(_viewMode, _selectedDate),
+        _getWordEntries(_viewMode, prevDate),
+        _getWordEntries(_viewMode, nextDate),
       ]);
 
       if (currentRefreshId != _refreshId) return;
@@ -262,9 +255,9 @@ class ActivityNotifier extends ChangeNotifier {
       final newCurrentChart = results[0] as List<int>;
       final newPrevChart = results[1] as List<int>;
       final newNextChart = results[2] as List<int>;
-      final newWordCounts = results[3] as List<WordSummary>;
-      final newPrevWordCounts = results[4] as List<WordSummary>;
-      final newNextWordCounts = results[5] as List<WordSummary>;
+      final newWordEntries = results[3] as List<WordSummary>;
+      final newPrevWordEntries = results[4] as List<WordSummary>;
+      final newNextWordEntries = results[5] as List<WordSummary>;
 
       bool dataUpdated = false;
       if (!listEquals(_currentChartData, newCurrentChart)) {
@@ -279,20 +272,20 @@ class ActivityNotifier extends ChangeNotifier {
         _nextChartData = newNextChart;
         dataUpdated = true;
       }
-      if (!_isWordCountsEqual(_currentWordCounts, newWordCounts)) {
-        _currentWordCounts = newWordCounts;
-        _currentCount = _currentWordCounts.fold(
+      if (!_isWordEntriesEqual(_currentWordEntries, newWordEntries)) {
+        _currentWordEntries = newWordEntries;
+        _currentCount = _currentWordEntries.fold(
           0,
           (sum, entry) => sum + entry.count,
         );
         dataUpdated = true;
       }
-      if (!_isWordCountsEqual(_previousWordCounts, newPrevWordCounts)) {
-        _previousWordCounts = newPrevWordCounts;
+      if (!_isWordEntriesEqual(_previousWordEntries, newPrevWordEntries)) {
+        _previousWordEntries = newPrevWordEntries;
         dataUpdated = true;
       }
-      if (!_isWordCountsEqual(_nextWordCounts, newNextWordCounts)) {
-        _nextWordCounts = newNextWordCounts;
+      if (!_isWordEntriesEqual(_nextWordEntries, newNextWordEntries)) {
+        _nextWordEntries = newNextWordEntries;
         dataUpdated = true;
       }
 
@@ -357,29 +350,29 @@ class ActivityNotifier extends ChangeNotifier {
     return data;
   }
 
-  Future<List<WordSummary>> _getWordCounts(
+  Future<List<WordSummary>> _getWordEntries(
     ActivityViewMode mode,
     DateTime date,
   ) async {
     final key = _getCacheKey(mode, date);
-    if (_wordCountsCache.containsKey(key)) return _wordCountsCache[key]!;
+    if (_entriesCache.containsKey(key)) return _entriesCache[key]!;
 
     List<WordSummary> data;
     switch (mode) {
       case ActivityViewMode.daily:
-        data = await _getWordCountsForDuration(date, 1);
+        data = await _getWordEntriesForDuration(date, 1);
         break;
       case ActivityViewMode.weekly:
         final firstDay = date.subtract(Duration(days: date.weekday - 1));
-        data = await _getWordCountsForDuration(firstDay, 7);
+        data = await _getWordEntriesForDuration(firstDay, 7);
         break;
       case ActivityViewMode.monthly:
         final firstDay = DateTime(date.year, date.month, 1);
         final lastDay = DateTime(date.year, date.month + 1, 0);
-        data = await _getWordCountsForDuration(firstDay, lastDay.day);
+        data = await _getWordEntriesForDuration(firstDay, lastDay.day);
         break;
     }
-    _wordCountsCache[key] = data;
+    _entriesCache[key] = data;
     return data;
   }
 
@@ -388,7 +381,7 @@ class ActivityNotifier extends ChangeNotifier {
     final modesToFetch = ActivityViewMode.values.where((m) => m != _viewMode);
     for (final mode in modesToFetch) {
       _getChartData(mode, date);
-      _getWordCounts(mode, date);
+      _getWordEntries(mode, date);
     }
 
     // Neighbors of neighbors (e.g. +/- 2 days)
@@ -402,8 +395,8 @@ class ActivityNotifier extends ChangeNotifier {
     );
     _getChartData(_viewMode, prevPrevDate);
     _getChartData(_viewMode, nextNextDate);
-    _getWordCounts(_viewMode, prevPrevDate);
-    _getWordCounts(_viewMode, nextNextDate);
+    _getWordEntries(_viewMode, prevPrevDate);
+    _getWordEntries(_viewMode, nextNextDate);
   }
 
   void _invalidateCacheForDate(DateTime date) {
@@ -415,9 +408,9 @@ class ActivityNotifier extends ChangeNotifier {
     _chartCache.remove(weeklyKey);
     _chartCache.remove(monthlyKey);
 
-    _wordCountsCache.remove(dailyKey);
-    _wordCountsCache.remove(weeklyKey);
-    _wordCountsCache.remove(monthlyKey);
+    _entriesCache.remove(dailyKey);
+    _entriesCache.remove(weeklyKey);
+    _entriesCache.remove(monthlyKey);
 
     _totalCountCache.remove(dailyKey);
     _totalCountCache.remove(weeklyKey);
@@ -429,7 +422,7 @@ class ActivityNotifier extends ChangeNotifier {
     notifyListeners();
 
     _chartCache.clear();
-    _wordCountsCache.clear();
+    _entriesCache.clear();
     _totalCountCache.clear();
 
     final log = await _db.getAllEntries();
@@ -457,7 +450,7 @@ class ActivityNotifier extends ChangeNotifier {
     await refreshData();
   }
 
-  Future<List<WordSummary>> _getWordCountsForDuration(
+  Future<List<WordSummary>> _getWordEntriesForDuration(
     DateTime date,
     int duration,
   ) async {
