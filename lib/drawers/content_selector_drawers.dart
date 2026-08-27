@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/app_preferences_notifier.dart';
@@ -203,7 +204,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                   Navigator.pop(context);
                 },
                 trailing: PopupMenuButton<String>(
-                  onSelected: (value) {
+                  onSelected: (value) async {
                     switch (value) {
                       case 'edit':
                         _showEditTitleDialog(entry, contentsNotifier);
@@ -211,6 +212,15 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                       case 'refresh':
                         contentsNotifier.fetchContent(entry[_keyUrl]);
                         contentsNotifier.persist();
+                        break;
+                      case 'open':
+                        final url = entry[_keyUrl];
+                        if (!await launchUrl(
+                          Uri.parse(url),
+                          mode: LaunchMode.externalApplication,
+                        )) {
+                          throw Exception('Could not launch $url');
+                        }
                         break;
                       case 'delete':
                         if (entry[_keyIsFavorite]) {
@@ -243,6 +253,16 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                           const Icon(Icons.refresh_outlined),
                           const SizedBox(width: 8),
                           Text(l10n.refreshCacheLabel),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'open',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.open_in_browser_outlined),
+                          const SizedBox(width: 8),
+                          Text(l10n.openLinkLabel),
                         ],
                       ),
                     ),

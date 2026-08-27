@@ -160,6 +160,7 @@
   "refreshCacheLabel": "Refresh Cache",
   "restoreButton": "Restore",
   "settingsNavButton": "Settings",
+  "openLinkLabel": "Open Link",
   "urlCopyRequest": "Please copy the link from your browser's address bar.",
   "@urlCopyRequest": {
     "description": "Request message when adding a link."

@@ -70,6 +70,7 @@
   "refreshCacheLabel": "Gyorsítótár frissítése",
   "restoreButton": "Visszaállítása",
   "settingsNavButton": "Beállítások",
+  "openLinkLabel": "Hivatkozás Megnyitása",
   "urlCopyRequest": "Kérjük, másolja ki a hivatkozást a böngésző címsorából.",
   "urlRequestMessage": "Kérjük, adjon meg egy hivatkozást",
   "wordCount": "{count} szó",

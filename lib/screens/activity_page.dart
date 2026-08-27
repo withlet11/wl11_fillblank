@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:readblank/l10n/app_localizations.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../providers/activity_notifier.dart';
 import '../providers/app_preferences_notifier.dart';
@@ -255,7 +256,18 @@ class _ActivityPageState extends State<ActivityPage> {
         return ExpansionTile(
           key: PageStorageKey('${keyString}_${entry.word}'),
           controlAffinity: ListTileControlAffinity.leading,
-          title: Text(entry.word, maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(entry.word, maxLines: 1, overflow: TextOverflow.ellipsis),
+              IconButton(
+                icon: Icon(Icons.share_outlined),
+                onPressed: () async {
+                  SharePlus.instance.share(ShareParams(text: entry.word));
+                },
+              ),
+            ],
+          ),
           trailing: Text(
             entry.count.toString(),
             style: Theme.of(context).textTheme.bodyMedium,

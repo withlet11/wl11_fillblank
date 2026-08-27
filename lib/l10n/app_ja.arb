@@ -70,6 +70,7 @@
   "refreshCacheLabel": "キャッシュ更新",
   "restoreButton": "復元",
   "settingsNavButton": "設定",
+  "openLinkLabel": "リンクを開く",
   "urlCopyRequest": "ブラウザのアドレスバーからリンクをコピーしてください。" ,
   "urlRequestMessage": "リンクを追加してください",
   "wordCount": "{count}単語",

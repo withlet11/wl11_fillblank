@@ -45,6 +45,7 @@ dependencies:
   shared_preferences: any
   share_plus: any
   sqflite: any
+  url_launcher: any
   webview_flutter: any
 
   flutter_localizations:
