@@ -261,7 +261,7 @@ class _ActivityPageState extends State<ActivityPage> {
             children: [
               Text(entry.word, maxLines: 1, overflow: TextOverflow.ellipsis),
               IconButton(
-                icon: Icon(Icons.share_outlined),
+                icon: Icon(Icons.share),
                 onPressed: () async {
                   SharePlus.instance.share(ShareParams(text: entry.word));
                 },
@@ -337,11 +337,11 @@ class _ActivityPageState extends State<ActivityPage> {
             tabs: [
               Tab(
                 text: l10n.contentsViewedLabel,
-                icon: const Icon(Icons.library_books_outlined),
+                icon: const Icon(Icons.library_books),
               ),
               Tab(
                 text: l10n.wordsEncounteredLabel,
-                icon: const Icon(Icons.abc_outlined),
+                icon: const Icon(Icons.abc),
               ),
             ],
           ),
@@ -417,7 +417,7 @@ class _ActivityPageState extends State<ActivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.abc_outlined),
+                const Icon(Icons.abc),
                 Text(l10n.wordCount(activityNotifier.currentCount)),
               ],
             ),
@@ -533,7 +533,7 @@ class _ActivityPageState extends State<ActivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.abc_outlined),
+                const Icon(Icons.abc),
                 Text(l10n.wordCount(activityNotifier.currentCount)),
               ],
             ),
@@ -641,7 +641,7 @@ class _ActivityPageState extends State<ActivityPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.abc_outlined),
+                const Icon(Icons.abc),
                 Text(l10n.wordCount(activityNotifier.currentCount)),
               ],
             ),

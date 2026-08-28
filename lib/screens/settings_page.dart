@@ -48,7 +48,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final settingsList = <Widget>[
       ListTile(
-        leading: const Icon(Icons.language_outlined),
+        leading: const Icon(Icons.language),
         title: Text(l10n.languageLabel),
         trailing: DropdownButton<Locale>(
           value: pref.locale,
@@ -63,7 +63,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       ListTile(
-        leading: const Icon(Icons.dark_mode_outlined),
+        leading: const Icon(Icons.dark_mode),
         title: Text(l10n.darkModeLabel),
         trailing: Switch(
           value: pref.isDarkMode,
@@ -73,7 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       ListTile(
-        leading: const Icon(Icons.format_size_outlined),
+        leading: const Icon(Icons.format_size),
         title: Text(l10n.fontSizeLabel),
         trailing: DropdownButton(
           items: pref.fontSizeFactorList.indexed.map((entry) {
@@ -98,7 +98,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       ListTile(
-        leading: const Icon(Icons.library_books_outlined),
+        leading: const Icon(Icons.library_books),
         title: Text(l10n.contentsRestoreLabel),
         trailing: IconButton(
           icon: _isLoadingContents
@@ -107,12 +107,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 )
-              : const Icon(Icons.settings_backup_restore_outlined),
+              : const Icon(Icons.settings_backup_restore),
           onPressed: _isImportingOrExporting ? null : _loadContents,
         ),
       ),
       ListTile(
-        leading: const Icon(Icons.library_books_outlined),
+        leading: const Icon(Icons.library_books),
         title: Text(l10n.contentsBackupLabel),
         trailing: IconButton(
           icon: _isSavingContents
@@ -121,12 +121,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 )
-              : const Icon(Icons.save_outlined),
+              : const Icon(Icons.save),
           onPressed: _isImportingOrExporting ? null : _saveContents,
         ),
       ),
       ListTile(
-        leading: const Icon(Icons.bar_chart_outlined),
+        leading: const Icon(Icons.bar_chart),
         title: Text(l10n.activityRestoreLabel),
         trailing: IconButton(
           icon: _isLoadingActivity
@@ -135,12 +135,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 )
-              : const Icon(Icons.settings_backup_restore_outlined),
+              : const Icon(Icons.settings_backup_restore),
           onPressed: _isImportingOrExporting ? null : _loadActivity,
         ),
       ),
       ListTile(
-        leading: const Icon(Icons.bar_chart_outlined),
+        leading: const Icon(Icons.bar_chart),
         title: Text(l10n.activityBackupLabel),
         trailing: IconButton(
           icon: _isSavingActivity
@@ -149,7 +149,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 )
-              : const Icon(Icons.save_outlined),
+              : const Icon(Icons.save),
           onPressed: _isImportingOrExporting ? null : _saveActivity,
         ),
       ),
@@ -175,10 +175,10 @@ class _SettingsPageState extends State<SettingsPage> {
         },
       ),
       ListTile(
-        leading: const Icon(Icons.library_books_outlined),
+        leading: const Icon(Icons.library_books),
         title: Text(l10n.licensesLabel),
         subtitle: Text(l10n.licensesDescription),
-        trailing: const Icon(Icons.chevron_right_outlined),
+        trailing: const Icon(Icons.chevron_right),
         onTap: () {
           showAboutDialog(
             context: context,

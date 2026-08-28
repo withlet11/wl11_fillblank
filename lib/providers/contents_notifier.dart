@@ -6,13 +6,17 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:html/parser.dart' as parser;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/app_localizations.dart';
+
 class CachedContent {
   final String? title;
+  final String? originalTitle;
   final List<String> paragraphs;
   final String? locale;
   final int size;
@@ -20,6 +24,7 @@ class CachedContent {
 
   CachedContent({
     required this.title,
+    required this.originalTitle,
     required this.paragraphs,
     required this.locale,
     required this.size,
@@ -38,6 +43,7 @@ class ContentsNotifier extends ChangeNotifier {
   static const String _keyUrl = 'url';
   static const String _keyLinkId = 'link_id';
   static const String _keyTitle = 'title';
+  static const String _keyOriginalTitle = 'original_title';
   static const String _keyFileSize = 'file_size';
   static const String _keyLocale = 'locale';
   static const String _keyTimestamp = 'timestamp';
@@ -108,11 +114,7 @@ class ContentsNotifier extends ChangeNotifier {
 
   bool _functionForFilteringWithFavoritesAndLocale(Map<String, dynamic> e) {
     return (!isFavoritesOnly || (e[_keyIsFavorite] ?? false)) &&
-        (_cachedContents[e[_keyUrl]]?.locale?.toLowerCase().replaceAll(
-              '-',
-              '_',
-            ) ==
-            targetLocale);
+        (e[_keyLocale]?.toLowerCase().replaceAll('-', '_') == targetLocale);
   }
 
   bool _functionForFilteringWithFavorites(Map<String, dynamic> e) {
@@ -134,7 +136,7 @@ class ContentsNotifier extends ChangeNotifier {
         _client = http.Client();
         _error = null;
         notifyListeners();
-        await fetchContent(url);
+        await _fetchContent(url);
       }
       _currentParagraphIndex = 0;
       final now = DateTime.now();
@@ -142,6 +144,7 @@ class ContentsNotifier extends ChangeNotifier {
         _keyUrl: url,
         _keyLinkId: _intToBase64(now.microsecondsSinceEpoch),
         _keyTitle: _getCachedTitle(url),
+        _keyOriginalTitle: _getCachedOriginalTitle(url),
         _keyFileSize: getCachedContentSize(url),
         _keyLocale: getCachedContentLocale(url),
         _keyTimestamp: now.toIso8601String(),
@@ -219,6 +222,11 @@ class ContentsNotifier extends ChangeNotifier {
       entry[_keyTitle] = _getCachedTitle(url);
     }
 
+    // title: default to cached original title if missing
+    if (entry[_keyOriginalTitle] == null) {
+      entry[_keyOriginalTitle] = _getCachedOriginalTitle(url);
+    }
+
     // file size: default to cached file size if missing
     if (entry[_keyFileSize] == null) {
       entry[_keyFileSize] = getCachedContentSize(url);
@@ -271,7 +279,8 @@ class ContentsNotifier extends ChangeNotifier {
       _client = http.Client();
       _error = null;
       notifyListeners();
-      await fetchContent(currentUrl);
+      await _fetchContent(currentUrl);
+      _selectedEntry![_keyOriginalTitle] = _getCachedOriginalTitle(currentUrl);
       _selectedEntry![_keyFileSize] = getCachedContentSize(currentUrl);
       _selectedEntry![_keyLocale] = getCachedContentLocale(currentUrl);
     } catch (e) {
@@ -283,6 +292,25 @@ class ContentsNotifier extends ChangeNotifier {
   }
 
   Future<void> fetchContent(String url) async {
+    if (isLoading) return;
+
+    try {
+      _client = http.Client();
+      _error = null;
+      notifyListeners();
+      await _fetchContent(url);
+      _selectedEntry![_keyOriginalTitle] = _getCachedOriginalTitle(url);
+      _selectedEntry![_keyFileSize] = getCachedContentSize(url);
+      _selectedEntry![_keyLocale] = getCachedContentLocale(url);
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _client = null;
+      persist(); // instead of notifyListeners();
+    }
+  }
+
+  Future<void> _fetchContent(String url) async {
     if (_client == null) throw Exception('Client is null');
 
     final response = await _client!.get(Uri.parse(url));
@@ -290,11 +318,14 @@ class ContentsNotifier extends ChangeNotifier {
     if (response.statusCode == 200) {
       final document = parser.parse(response.body);
       final lang = document.documentElement?.attributes['lang'];
-      final title = document.querySelector('title')?.text;
+      final originalTitle = document.querySelector('title')?.text;
       final pElements = document.getElementsByTagName('p');
       final locale = lang?.toLowerCase().replaceAll('-', '_');
+      final title = _cachedContents[url]?.title ?? originalTitle;
+      print('set original title: $originalTitle');
       _cachedContents[url] = CachedContent(
         title: title,
+        originalTitle: originalTitle,
         paragraphs: pElements
             .map((element) => element.text.trim())
             .where((text) => text.isNotEmpty)
@@ -316,6 +347,9 @@ class ContentsNotifier extends ChangeNotifier {
       _cachedContents[url]?.paragraphs;
 
   String? _getCachedTitle(String url) => _cachedContents[url]?.title;
+
+  String? _getCachedOriginalTitle(String url) =>
+      _cachedContents[url]?.originalTitle;
 
   String getCachedContentSize(String url) {
     final size = _cachedContents[url]?.size;
@@ -403,6 +437,131 @@ class ContentsNotifier extends ChangeNotifier {
     }
   }
 
+  Future<void> addLink(AppLocalizations l10n, BuildContext context) async {
+    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    final String? copiedText = data?.text;
+    if (copiedText != null && copiedText.isNotEmpty) {
+      try {
+        final response = await http.get(Uri.parse(copiedText));
+        if (response.statusCode == 200) {
+          final document = parser.parse(response.body);
+          final pElements = document.getElementsByTagName('p');
+          if (pElements.any((element) => element.text.trim().isNotEmpty)) {
+            if (contains(copiedText)) {
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l10n.alreadyExistsMessage),
+                    content: Text(l10n.existingLinkOpenConfirmation),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(l10n.commonCancel),
+                      ),
+                      FilledButton(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          select(copiedText);
+                        },
+                        child: Text(l10n.commonOpen),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            } else {
+              add(copiedText);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.linkAdditionSuccessMessage),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          } else {
+            if (context.mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(l10n.noTextLabel),
+                  content: Text(l10n.notContainsParagraphMessage),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(l10n.commonOk),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+        } else {
+          if (context.mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(l10n.invalidUrlLabel),
+                content: Text(l10n.urlCopyRequest),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(l10n.commonOk),
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (context.mounted) {
+          final colorScheme = Theme.of(context).colorScheme;
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: colorScheme.errorContainer,
+              title: Row(
+                children: [
+                  Icon(Icons.error, color: colorScheme.onErrorContainer),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.errorLabel,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
+                  ),
+                ],
+              ),
+              content: Text(e.toString(), maxLines: 5),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(l10n.commonOk),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } else {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(l10n.noCopiedUrlLabel),
+            content: Text(l10n.urlCopyRequest),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l10n.commonOk),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   Future<String?> exportContents() async {
     final linkIds = <String>{};
     final normalizedList = _linkList
@@ -443,6 +602,8 @@ class ContentsNotifier extends ChangeNotifier {
     normalizedEntry[_keyUrl] = url;
     normalizedEntry[_keyLinkId] = linkId;
     normalizedEntry[_keyTitle] = entry[_keyTitle] ?? _getCachedTitle(url);
+    normalizedEntry[_keyOriginalTitle] =
+        entry[_keyOriginalTitle] ?? _getCachedOriginalTitle(url);
     normalizedEntry[_keyFileSize] =
         entry[_keyFileSize] ?? getCachedContentSize(url);
     normalizedEntry[_keyLocale] =
@@ -500,6 +661,7 @@ class ContentsNotifier extends ChangeNotifier {
       _keyUrl: url,
       _keyLinkId: linkId,
       _keyTitle: entry[_keyTitle],
+      _keyOriginalTitle: entry[_keyOriginalTitle],
       _keyFileSize: entry[_keyFileSize] ?? '? B',
       _keyLocale: entry[_keyLocale] ?? '',
       _keyTimestamp: entry[_keyTimestamp] ?? DateTime.now().toIso8601String(),

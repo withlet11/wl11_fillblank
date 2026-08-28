@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:readblank/screens/settings_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:readblank/screens/activity_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'drawers/content_selector_drawers.dart';
 import 'l10n/app_localizations.dart';
@@ -192,6 +193,8 @@ class _MainPageState extends State<MainPage> {
   }
 
   AppBar _buildAppBarForRead(ContentsNotifier contentsNotifier) {
+    final l10n = AppLocalizations.of(context)!;
+
     return AppBar(
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,16 +216,10 @@ class _MainPageState extends State<MainPage> {
       automaticallyImplyActions: false,
       actions: [
         Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.add_link_outlined),
-            onPressed: _addLink,
-          ),
-        ),
-        Builder(
           builder: (context) => contentsNotifier.isLoading
               ? IconButton(
                   icon: Icon(
-                    Icons.stop_circle_outlined,
+                    Icons.stop_circle,
                     color: Theme.of(context).colorScheme.error,
                   ),
                   onPressed: () {
@@ -230,14 +227,71 @@ class _MainPageState extends State<MainPage> {
                   },
                 )
               : IconButton(
-                  icon: const Icon(Icons.library_books_outlined),
+                  icon: const Icon(Icons.library_books),
                   onPressed: () {
                     Scaffold.of(context).openEndDrawer();
                   },
                 ),
         ),
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'open_page':
+                contentsNotifier.addLink(l10n, context);
+                break;
+              case 'refresh':
+                contentsNotifier.fetchCurrentContent();
+                contentsNotifier.persist();
+                break;
+              case 'open_in_browser':
+                _openWebPageInBrowser(contentsNotifier.currentUrl);
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'open_page',
+              child: Row(
+                children: [
+                  const Icon(Icons.add_link),
+                  const SizedBox(width: 8),
+                  Text(l10n.openPageLabel),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'refresh',
+              child: Row(
+                children: [
+                  const Icon(Icons.refresh),
+                  const SizedBox(width: 8),
+                  Text(l10n.refreshCacheLabel),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'open_in_browser',
+              child: Row(
+                children: [
+                  const Icon(Icons.open_in_new),
+                  const SizedBox(width: 8),
+                  Text(l10n.openInBrowserLabel),
+                ],
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  Future<void> _openWebPageInBrowser(String url) async {
+    if (!await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    )) {
+      throw Exception('Could not launch $url');
+    }
   }
 
   AppBar _buildAppBarForLog(ActivityNotifier activityNotifier) {
@@ -251,19 +305,19 @@ class _MainPageState extends State<MainPage> {
       automaticallyImplyActions: false,
       actions: [
         IconButton(
-          icon: Icon(Icons.looks_one_outlined),
+          icon: Icon(Icons.looks_one),
           onPressed: activityNotifier.viewMode == ActivityViewMode.daily
               ? null
               : () => activityNotifier.viewMode = ActivityViewMode.daily,
         ),
         IconButton(
-          icon: Icon(Icons.calendar_view_week_outlined),
+          icon: Icon(Icons.calendar_view_week),
           onPressed: activityNotifier.viewMode == ActivityViewMode.weekly
               ? null
               : () => activityNotifier.viewMode = ActivityViewMode.weekly,
         ),
         IconButton(
-          icon: Icon(Icons.calendar_view_month_outlined),
+          icon: Icon(Icons.calendar_view_month),
           onPressed: activityNotifier.viewMode == ActivityViewMode.monthly
               ? null
               : () => activityNotifier.viewMode = ActivityViewMode.monthly,
@@ -298,7 +352,7 @@ class _MainPageState extends State<MainPage> {
       destinations: [
         NavigationDestination(
           label: l10n.readNavButton,
-          icon: const Icon(Icons.article_outlined),
+          icon: const Icon(Icons.article),
         ),
         NavigationDestination(
           label: l10n.activityNavButton,
@@ -310,132 +364,5 @@ class _MainPageState extends State<MainPage> {
         ),
       ],
     );
-  }
-
-  void _addLink() async {
-    final l10n = AppLocalizations.of(context)!;
-    final contentsNotifier = context.read<ContentsNotifier>();
-    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
-    final String? copiedText = data?.text;
-    if (copiedText != null && copiedText.isNotEmpty) {
-      try {
-        final response = await http.get(Uri.parse(copiedText));
-        if (response.statusCode == 200) {
-          final document = parser.parse(response.body);
-          final pElements = document.getElementsByTagName('p');
-          if (pElements.any((element) => element.text.trim().isNotEmpty)) {
-            if (contentsNotifier.contains(copiedText)) {
-              if (mounted) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text(l10n.alreadyExistsMessage),
-                    content: Text(l10n.existingLinkOpenConfirmation),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(l10n.commonCancel),
-                      ),
-                      FilledButton(
-                        onPressed: () async {
-                          Navigator.of(context).pop();
-                          contentsNotifier.select(copiedText);
-                        },
-                        child: Text(l10n.commonOpen),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            } else {
-              contentsNotifier.add(copiedText);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.linkAdditionSuccessMessage),
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            }
-          } else {
-            if (mounted) {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(l10n.noTextLabel),
-                  content: Text(l10n.notContainsParagraphMessage),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(l10n.commonOk),
-                    ),
-                  ],
-                ),
-              );
-            }
-          }
-        } else {
-          if (mounted) {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text(l10n.invalidUrlLabel),
-                content: Text(l10n.urlCopyRequest),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(l10n.commonOk),
-                  ),
-                ],
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          final colorScheme = Theme.of(context).colorScheme;
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              backgroundColor: colorScheme.errorContainer,
-              title: Row(
-                children: [
-                  Icon(Icons.error, color: colorScheme.onErrorContainer),
-                  const SizedBox(width: 8),
-                  Text(
-                    l10n.errorLabel,
-                    style: TextStyle(color: colorScheme.onErrorContainer),
-                  ),
-                ],
-              ),
-              content: Text(e.toString(), maxLines: 5),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(l10n.commonOk),
-                ),
-              ],
-            ),
-          );
-        }
-      }
-    } else {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(l10n.noCopiedUrlLabel),
-            content: Text(l10n.urlCopyRequest),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(l10n.commonOk),
-              ),
-            ],
-          ),
-        );
-      }
-    }
   }
 }

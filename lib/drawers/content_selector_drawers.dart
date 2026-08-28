@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -21,6 +22,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
     with SingleTickerProviderStateMixin {
   static const String _keyUrl = 'url';
   static const String _keyTitle = 'title';
+  static const String _keyOriginalTitle = 'original_title';
   static const String _keyFileSize = 'file_size';
   static const String _keyLocale = 'locale';
   static const String _keyTimestamp = 'timestamp';
@@ -47,12 +49,22 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                 Column(
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        const Icon(Icons.library_books_outlined),
-                        Text(
-                          l10n.contentListLabel,
-                          style: Theme.of(context).textTheme.titleMedium,
+                        Row(
+                          children: [
+                            const Icon(Icons.library_books),
+                            Text(
+                              l10n.contentListLabel,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        IconButton.filled(
+                          icon: const Icon(Icons.add_link),
+                          visualDensity: VisualDensity.comfortable,
+                          onPressed: () =>
+                              contentsNotifier.addLink(l10n, context),
                         ),
                       ],
                     ),
@@ -70,8 +82,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                           icon: Icon(
                             contentsNotifier.isFavoritesOnly
                                 ? Icons.filter_alt
-                                : Icons.filter_alt_outlined,
-                            size: 16 * fontSizeFactor,
+                                : Icons.filter_alt_off,
                           ),
                           label: Text(l10n.favoritesLabel),
                           onPressed: () {
@@ -83,7 +94,10 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                         DropdownButton<String?>(
                           value: contentsNotifier.targetLocale,
                           items: [
-                            DropdownMenuItem(value: null, child: Text('All🌐')),
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text(l10n.allLanguage),
+                            ),
                             for (final locale in contentsNotifier.locales)
                               DropdownMenuItem(
                                 value: locale,
@@ -125,8 +139,8 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                 ),
                 leading: IconButton(
                   isSelected: entry[_keyIsFavorite] ?? false,
-                  icon: const Icon(Icons.star_outline_outlined),
-                  selectedIcon: const Icon(Icons.star_outlined),
+                  icon: const Icon(Icons.star_outline),
+                  selectedIcon: const Icon(Icons.star),
                   onPressed: () {
                     final isFavorite = entry[_keyIsFavorite] ?? false;
                     entry[_keyIsFavorite] = !isFavorite;
@@ -158,10 +172,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                     ),
                     Row(
                       children: [
-                        Icon(
-                          Icons.calendar_month_outlined,
-                          size: 12 * fontSizeFactor,
-                        ),
+                        Icon(Icons.calendar_month, size: 12 * fontSizeFactor),
                         Expanded(
                           child: Text(
                             DateFormat.yMMMd(l10n.localeName).add_jm().format(
@@ -175,20 +186,14 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                     ),
                     Row(
                       children: [
-                        Icon(
-                          Icons.language_outlined,
-                          size: 12 * fontSizeFactor,
-                        ),
+                        Icon(Icons.language, size: 12 * fontSizeFactor),
                         Text(
                           entry[_keyLocale] ?? '?',
                           style: Theme.of(context).textTheme.bodySmall,
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(width: 12),
-                        Icon(
-                          Icons.data_usage_outlined,
-                          size: 12 * fontSizeFactor,
-                        ),
+                        Icon(Icons.data_usage, size: 12 * fontSizeFactor),
                         Text(
                           entry[_keyFileSize] ?? '? B',
                           style: Theme.of(context).textTheme.bodySmall,
@@ -204,7 +209,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                   Navigator.pop(context);
                 },
                 trailing: PopupMenuButton<String>(
-                  onSelected: (value) async {
+                  onSelected: (value) {
                     switch (value) {
                       case 'edit':
                         _showEditTitleDialog(entry, contentsNotifier);
@@ -214,13 +219,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                         contentsNotifier.persist();
                         break;
                       case 'open':
-                        final url = entry[_keyUrl];
-                        if (!await launchUrl(
-                          Uri.parse(url),
-                          mode: LaunchMode.externalApplication,
-                        )) {
-                          throw Exception('Could not launch $url');
-                        }
+                        _openWebPageInBrowser(entry[_keyUrl]);
                         break;
                       case 'delete':
                         if (entry[_keyIsFavorite]) {
@@ -240,7 +239,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                       value: 'edit',
                       child: Row(
                         children: [
-                          const Icon(Icons.edit_outlined),
+                          const Icon(Icons.edit),
                           const SizedBox(width: 8),
                           Text(l10n.editTitleLabel),
                         ],
@@ -250,7 +249,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                       value: 'refresh',
                       child: Row(
                         children: [
-                          const Icon(Icons.refresh_outlined),
+                          const Icon(Icons.refresh),
                           const SizedBox(width: 8),
                           Text(l10n.refreshCacheLabel),
                         ],
@@ -260,9 +259,9 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                       value: 'open',
                       child: Row(
                         children: [
-                          const Icon(Icons.open_in_browser_outlined),
+                          const Icon(Icons.open_in_new),
                           const SizedBox(width: 8),
-                          Text(l10n.openLinkLabel),
+                          Text(l10n.openInBrowserLabel),
                         ],
                       ),
                     ),
@@ -272,7 +271,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                       child: Row(
                         children: [
                           Icon(
-                            Icons.delete_outlined,
+                            Icons.delete,
                             color: Theme.of(context).colorScheme.error,
                           ),
                           const SizedBox(width: 8),
@@ -294,7 +293,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                       foregroundColor: Theme.of(context).colorScheme.error,
                     ),
                     onPressed: _clearAllHistory,
-                    icon: const Icon(Icons.delete_sweep_outlined),
+                    icon: const Icon(Icons.delete_sweep),
                     label: Text(l10n.allContentsClearButton),
                   ),
                 ],
@@ -360,28 +359,56 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
   ) async {
     final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController(text: entry[_keyTitle]);
+    final originalTitle = entry[_keyOriginalTitle];
 
     final newTitle = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.editTitleLabel),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(hintText: l10n.noTitle),
-          maxLines: null,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: Text(l10n.commonOk),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(l10n.editTitleLabel),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(hintText: l10n.noTitle),
+                maxLines: null,
+                onChanged: (value) {
+                  setState(() {});
+                },
+              ),
+              actionsOverflowAlignment: OverflowBarAlignment.start,
+              actions: [
+                TextButton(
+                  onPressed:
+                      (originalTitle == null ||
+                          originalTitle == controller.text)
+                      ? null
+                      : () {
+                          setState(() {
+                            controller.text = originalTitle;
+                          });
+                        },
+                  child: Text(l10n.restoreOriginalButton),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(l10n.commonCancel),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, controller.text),
+                      child: Text(l10n.commonSave),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
 
     if (newTitle != null) {
@@ -390,6 +417,15 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
         entry[_keyTitle] = trimmedTitle.isEmpty ? null : trimmedTitle;
         contentsNotifier.persist();
       }
+    }
+  }
+
+  Future<void> _openWebPageInBrowser(String url) async {
+    if (!await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    )) {
+      throw Exception('Could not launch $url');
     }
   }
 
