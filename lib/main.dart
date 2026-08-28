@@ -5,9 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:html/parser.dart' as parser;
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:readblank/screens/plain_text_page.dart';
 import 'package:readblank/screens/settings_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:readblank/screens/activity_page.dart';
@@ -171,19 +170,219 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final pref = context.watch<AppPreferencesNotifier>();
+
     return Consumer2<ContentsNotifier, ActivityNotifier>(
       builder: (context, contentsNotifier, activityNotifier, child) {
         return Scaffold(
           appBar: _selectedIndex == 0
               ? _buildAppBarForRead(contentsNotifier)
-              : _selectedIndex == 1
-              ? _buildAppBarForLog(activityNotifier)
-              : _buildAppBarForSettings(),
+              : _buildAppBarForLog(activityNotifier),
           body: _selectedIndex == 0
               ? const ReadPage(key: Key('ReadPage'), title: 'Read')
-              : _selectedIndex == 1
-              ? const ActivityPage(key: Key('ActivityPage'), title: 'Activity')
-              : const SettingsPage(key: Key('SettingsPage'), title: 'Settings'),
+              : const ActivityPage(key: Key('ActivityPage'), title: 'Activity'),
+          drawer: _selectedIndex == 0
+              ? NavigationDrawer(
+                  header: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        Text(
+                          'ReadBlank',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Image.asset(
+                          'assets/images/app_icon.png',
+                          width: 64,
+                          height: 64,
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                      ],
+                    ),
+                  ),
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.add_link),
+                      title: Text(l10n.openPageLabel),
+                      subtitle: Text(l10n.openPageDescription),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        contentsNotifier.addLink(l10n, context);
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.refresh),
+                      title: Text(l10n.refreshCacheLabel),
+                      subtitle: Text(l10n.refreshCacheDescription),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        contentsNotifier.fetchCurrentContent();
+                        contentsNotifier.persist();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.text_snippet),
+                      title: Text(l10n.viewPlainTextLabel),
+                      subtitle: Text(l10n.viewPlainTextDescription),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (BuildContext context) {
+                              return PlainTextPage(
+                                title:
+                                    contentsNotifier.currentTitle ??
+                                    l10n.noTitle,
+                                domain: contentsNotifier.currentDomainName,
+                                paragraphs:
+                                    contentsNotifier.currentParagraphList ??
+                                    <String>[],
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.open_in_new),
+                      title: Text(l10n.openInBrowserLabel),
+                      subtitle: Text(l10n.openInBrowserDescription),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        _openWebPageInBrowser(contentsNotifier.currentUrl);
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.language),
+                      title: Text(l10n.languageLabel),
+                      trailing: DropdownButton<Locale>(
+                        value: pref.locale,
+                        onChanged: (Locale? locale) {
+                          if (locale != null) pref.setLocale(locale);
+                        },
+                        items: const [
+                          DropdownMenuItem(
+                            value: Locale('en'),
+                            child: Text('English'),
+                          ),
+                          DropdownMenuItem(
+                            value: Locale('hu'),
+                            child: Text('Magyar'),
+                          ),
+                          DropdownMenuItem(
+                            value: Locale('ja'),
+                            child: Text('日本語'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.dark_mode),
+                      title: Text(l10n.darkModeLabel),
+                      trailing: Switch(
+                        value: pref.isDarkMode,
+                        onChanged: (bool value) {
+                          pref.setDarkMode(value);
+                        },
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.format_size),
+                      title: Text(l10n.fontSizeLabel),
+                      trailing: DropdownButton(
+                        items: pref.fontSizeFactorList.indexed.map((entry) {
+                          final (index, factor) = entry;
+                          return DropdownMenuItem(
+                            value: index,
+                            child: Text(
+                              factor < 0.9
+                                  ? l10n.fontSizeSmall
+                                  : factor < 1.1
+                                  ? l10n.fontSizeMedium
+                                  : factor < 1.3
+                                  ? l10n.fontSizeLarge
+                                  : l10n.fontSizeXLarge,
+                            ),
+                          );
+                        }).toList(),
+                        value: pref.fontSizeIndex,
+                        onChanged: (int? index) {
+                          if (index != null) pref.setFontSizeIndex(index);
+                        },
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.settings),
+                      title: Text(l10n.settingsNavButton),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (BuildContext context) {
+                              return const SettingsPage();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(l10n.eulaLabel),
+                      subtitle: Text(l10n.eulaDescription),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text(l10n.eulaDialogTitle),
+                            content: SingleChildScrollView(
+                              child: Text(l10n.eulaText),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text(l10n.commonClose),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.library_books),
+                      title: Text(l10n.licensesLabel),
+                      subtitle: Text(l10n.licensesDescription),
+                      onTap: () {
+                        Navigator.of(context).pop();
+
+                        showAboutDialog(
+                          context: context,
+                          applicationName: l10n.appName,
+                          applicationVersion: l10n.appVersion,
+                          applicationLegalese: l10n.appLegalese,
+                          applicationIcon: Image.asset(
+                            'assets/images/app_icon.png',
+                            width: 64,
+                            height: 64,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                )
+              : null,
           endDrawer: const ContentSelectorDrawers(),
           endDrawerEnableOpenDragGesture: false,
           bottomNavigationBar: _buildNavigationBar(),
@@ -193,8 +392,6 @@ class _MainPageState extends State<MainPage> {
   }
 
   AppBar _buildAppBarForRead(ContentsNotifier contentsNotifier) {
-    final l10n = AppLocalizations.of(context)!;
-
     return AppBar(
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,54 +429,6 @@ class _MainPageState extends State<MainPage> {
                     Scaffold.of(context).openEndDrawer();
                   },
                 ),
-        ),
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'open_page':
-                contentsNotifier.addLink(l10n, context);
-                break;
-              case 'refresh':
-                contentsNotifier.fetchCurrentContent();
-                contentsNotifier.persist();
-                break;
-              case 'open_in_browser':
-                _openWebPageInBrowser(contentsNotifier.currentUrl);
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'open_page',
-              child: Row(
-                children: [
-                  const Icon(Icons.add_link),
-                  const SizedBox(width: 8),
-                  Text(l10n.openPageLabel),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'refresh',
-              child: Row(
-                children: [
-                  const Icon(Icons.refresh),
-                  const SizedBox(width: 8),
-                  Text(l10n.refreshCacheLabel),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'open_in_browser',
-              child: Row(
-                children: [
-                  const Icon(Icons.open_in_new),
-                  const SizedBox(width: 8),
-                  Text(l10n.openInBrowserLabel),
-                ],
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -326,19 +475,6 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  AppBar _buildAppBarForSettings() {
-    final l10n = AppLocalizations.of(context)!;
-
-    return AppBar(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Text(l10n.settingsNavButton)],
-      ),
-      automaticallyImplyActions: false,
-      actions: [],
-    );
-  }
-
   NavigationBar _buildNavigationBar() {
     final l10n = AppLocalizations.of(context)!;
 
@@ -357,10 +493,6 @@ class _MainPageState extends State<MainPage> {
         NavigationDestination(
           label: l10n.activityNavButton,
           icon: const Icon(Icons.bar_chart),
-        ),
-        NavigationDestination(
-          label: l10n.settingsNavButton,
-          icon: const Icon(Icons.settings),
         ),
       ],
     );

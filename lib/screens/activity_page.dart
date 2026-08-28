@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:readblank/l10n/app_localizations.dart';
+import 'package:readblank/screens/plain_text_page.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../providers/activity_notifier.dart';
@@ -282,6 +283,25 @@ class _ActivityPageState extends State<ActivityPage> {
             return ListTile(
               title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
               subtitle: domain.isNotEmpty ? Text('$domain [$locale]') : null,
+              trailing: IconButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (BuildContext context) {
+                        return PlainTextPage(
+                          title: title,
+                          domain: domain,
+                          paragraphs:
+                              contentsNotifier.currentParagraphList ??
+                              <String>[],
+                          searchWord: entry.word,
+                        );
+                      },
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.text_snippet),
+              ),
             );
           }).toList(),
         );

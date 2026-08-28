@@ -152,7 +152,15 @@
   "@notContainsParagraphMessage": {
     "description": "Notification shown when no paragraphs at the copied link."
   },
+  "openInBrowserDescription": "Open the current page in the browser.",
+  "@openInBrowserDescription": {
+    "description": "Description of open in browser button."
+  },
   "openInBrowserLabel": "Open in browser",
+  "openPageDescription": "Copy the link from your browser's address bar and click here to open the page.",
+  "@openPageDescription": {
+    "description": "Description of open page button."
+  },
   "openPageLabel": "Open page",
   "pageLoadFailMessage": "Failed to load the page",
   "@pageLoadFailMessage": {
@@ -160,6 +168,10 @@
   },
   "pasteButton": "Paste",
   "readNavButton": "Read",
+  "refreshCacheDescription": "Refresh the cache of the current page.",
+  "@refreshCacheDescription": {
+    "description": "Description of refresh cache button."
+  },
   "refreshCacheLabel": "Refresh Cache",
   "restoreButton": "Restore",
   "restoreOriginalButton": "Restore original",
@@ -169,6 +181,11 @@
     "description": "Request message when adding a link."
   },
   "urlRequestMessage": "Please add a link",
+  "viewPlainTextDescription": "View the current page as plain text.",
+  "@viewPlainTextDescription": {
+    "description": "Description of view plain text button."
+  },
+  "viewPlainTextLabel": "View as plain text",
   "wordCount": "{count, plural, zero {no words} one {1 word} other {{count} words}}",
   "@wordCount": {
     "description": "Formated text for word count.",

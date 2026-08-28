@@ -62,7 +62,7 @@ class _ContentSelectorDrawersState extends State<ContentSelectorDrawers>
                         ),
                         IconButton.filled(
                           icon: const Icon(Icons.add_link),
-                          visualDensity: VisualDensity.comfortable,
+                          visualDensity: VisualDensity.compact,
                           onPressed: () =>
                               contentsNotifier.addLink(l10n, context),
                         ),
