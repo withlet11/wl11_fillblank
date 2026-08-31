@@ -1,8 +1,5 @@
 {
   "@@locale": "en",
-  "hiddenPartDescription": "Choose the part of each word to hide.",
-  "hiddenPartLabel": "Hidden Part",
-  "wholeWordsLabel": "Whole",
   "beginningOfWordsLabel": "Beginning",
   "endOfWordsLabel": "End",
   "activityBackupCancelledMessage": "Activity backup cancelled.",
@@ -107,6 +104,7 @@
   "eulaDialogTitle": "Terms of Use (EULA)",
   "eulaLabel": "End User License Agreement",
   "eulaText": "END USER LICENSE AGREEMENT (EULA)\n\n1. ACCEPTANCE OF TERMS\nBy downloading, installing, or using this application (\"Application\"), you agree to be bound by the terms of this End User License Agreement (\"EULA\"). If you do not agree to these terms, do not install or use the Application.\n\n2. LICENSE GRANT\nWITHLET11 grants you a limited, non-exclusive, non-transferable, revocable license to download, install, and use the Application on devices that you own or control.\n\n3. COPYRIGHT & PROPRIETARY ASSETS\nThe source code of the Application is licensed under the MIT License. The MIT License applies to the source code only. The application icon, custom graphics, images, user interface designs, and other original visual assets are not covered by the MIT License and remain the property of WITHLET11.\nThe original application name and other branding elements are not licensed under the MIT License. This EULA does not grant permission to reuse these proprietary assets or the original application name when redistributing the Application or a modified version of it.\n\n4. RESTRICTIONS\nYou agree NOT to:\na) Re-upload or redistribute the Application, or a modified version of it, using the original application name, app icon, or proprietary visual assets in a manner that suggests it is the original Application or an authorized version.\nb) Remove, alter, or obscure any copyright notices or proprietary markings within the Application.\n\n5. DISCLAIMER OF WARRANTY & LIMITATION OF LIABILITY\nTHE APPLICATION IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE DEVELOPER SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING FROM THE USE OR INABILITY TO USE THE APPLICATION. TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT PAID BY YOU FOR THE APPLICATION.\n\n6. CONTACT INFORMATION\nFor questions regarding this EULA, please contact: withlet11@gmail.com",
+  "exactMatchLabel": "Exact match",
   "existingLinkOpenConfirmation": "This link has already been added. Do you want to open it?",
   "favoriteCannotDeleteConfirmation": "This link is a favorite. To delete it, please remove it from your favorites first.",
   "favoritesLabel": "Favorites",
@@ -117,6 +115,8 @@
   "fontSizeMedium": "Medium",
   "fontSizeSmall": "Small",
   "fontSizeXLarge": "X-Large",
+  "hiddenPartDescription": "Choose the part of each word to hide.",
+  "hiddenPartLabel": "Hidden Part",
   "importCount": "Imported {successCount}",
   "@importCount": {
     "description": "Error message shown when counting imported links fails.",
@@ -192,6 +192,7 @@
     "description": "Description of view plain text button."
   },
   "viewPlainTextLabel": "View as plain text",
+  "wholeWordsLabel": "Whole",
   "wordCount": "{count, plural, zero {no words} one {1 word} other {{count} words}}",
   "@wordCount": {
     "description": "Formated text for word count.",

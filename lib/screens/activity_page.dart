@@ -293,6 +293,7 @@ class _ActivityPageState extends State<ActivityPage> {
                               contentsNotifier.currentParagraphList ??
                               <String>[],
                           searchWord: entry.word,
+                          isExactMatch: true,
                         );
                       },
                     ),

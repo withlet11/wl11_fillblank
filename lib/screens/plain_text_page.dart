@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../style.dart';
 
 class PlainTextPage extends StatefulWidget {
@@ -11,6 +12,7 @@ class PlainTextPage extends StatefulWidget {
   final String domain;
   final List<String> paragraphs;
   final String? searchWord;
+  final bool isExactMatch;
 
   const PlainTextPage({
     super.key,
@@ -18,6 +20,7 @@ class PlainTextPage extends StatefulWidget {
     required this.domain,
     required this.paragraphs,
     this.searchWord,
+    this.isExactMatch = false,
   });
 
   @override
@@ -29,6 +32,7 @@ class _PlainTextPageState extends State<PlainTextPage> {
   late String _domain;
   late List<String> _paragraphs;
   late String? _searchWord;
+  late bool _isExactMatch;
 
   final _textEditingController = TextEditingController();
 
@@ -41,6 +45,7 @@ class _PlainTextPageState extends State<PlainTextPage> {
     _paragraphs = widget.paragraphs;
     _searchWord = widget.searchWord;
     _textEditingController.text = _searchWord ?? '';
+    _isExactMatch = widget.isExactMatch;
   }
 
   @override
@@ -53,6 +58,7 @@ class _PlainTextPageState extends State<PlainTextPage> {
   Widget build(BuildContext context) {
     final palette = ContentViewPalette.of(context);
     final highlightColor = palette.accent;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -83,15 +89,40 @@ class _PlainTextPageState extends State<PlainTextPage> {
                 vertical: 0,
                 horizontal: 16,
               ),
-              child: TextField(
-                controller: _textEditingController,
-                decoration: InputDecoration(
-                  labelText: 'Search',
-                  prefixIcon: const Icon(Icons.search),
-                ),
-                onChanged: (value) {
-                  setState(() {});
-                },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _textEditingController,
+                      decoration: const InputDecoration(
+                        labelText: 'Search',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (value) {
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Checkbox(
+                        visualDensity: VisualDensity.compact,
+                        value: _isExactMatch,
+                        onChanged: (value) {
+                          setState(() {
+                            _isExactMatch = value ?? false;
+                          });
+                        },
+                      ),
+                      Text(
+                        l10n.exactMatchLabel,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -101,10 +132,14 @@ class _PlainTextPageState extends State<PlainTextPage> {
                   children: [
                     for (final (index, paragraph) in _paragraphs.indexed)
                       if (_textEditingController.text.isEmpty ||
-                          containsWholeWord(
-                            paragraph,
-                            _textEditingController.text,
-                          ))
+                          (_isExactMatch
+                              ? containsWholeWord(
+                                  paragraph,
+                                  _textEditingController.text,
+                                )
+                              : paragraph.toLowerCase().contains(
+                                  _textEditingController.text.toLowerCase(),
+                                )))
                         Padding(
                           padding: const EdgeInsetsGeometry.symmetric(
                             vertical: 0,
@@ -185,8 +220,9 @@ class _PlainTextPageState extends State<PlainTextPage> {
           TextSpan(text: text.substring(end, begin), style: normalStyle),
         );
         end = begin + searchWord.length;
-        if ((begin == 0 || !isLatinChar(text[begin - 1])) &&
-            (end >= lowerCaseText.length || !isLatinChar(text[end]))) {
+        if (!_isExactMatch ||
+            ((begin == 0 || !isLatinChar(text[begin - 1])) &&
+                (end >= lowerCaseText.length || !isLatinChar(text[end])))) {
           spans.add(
             TextSpan(text: text.substring(begin, end), style: highlightStyle),
           );
