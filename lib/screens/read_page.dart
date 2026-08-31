@@ -5,19 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../providers/app_preferences_notifier.dart';
 import '../views/content_view.dart';
 import '../providers/contents_notifier.dart';
 
 class ReadPage extends StatefulWidget {
-  final String title;
-
-  const ReadPage({super.key, required this.title});
+  const ReadPage({super.key});
 
   @override
   State<ReadPage> createState() => _ReadPageState();
 }
 
 class _ReadPageState extends State<ReadPage> {
+  late HiddenMode hiddenMode;
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ContentsNotifier>(
@@ -49,6 +50,7 @@ class _ReadPageState extends State<ReadPage> {
 
   Widget _buildContent(ContentsNotifier notifier) {
     final l10n = AppLocalizations.of(context)!;
+    final hiddenMode = context.watch<AppPreferencesNotifier>().hiddenMode;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -58,13 +60,15 @@ class _ReadPageState extends State<ReadPage> {
               height: constraints.maxHeight * 0.9,
               child: ContentView(
                 key: ValueKey(
-                  '${notifier.currentParagraphIndex}_${notifier.currentParagraph}',
+                  '${notifier.currentParagraphIndex}_${notifier.currentParagraph}_$hiddenMode',
                 ),
-                paragraph: (notifier.isLoading ||
+                paragraph:
+                    (notifier.isLoading ||
                         (notifier.linkList.isNotEmpty &&
                             notifier.currentParagraph == null))
                     ? ''
                     : (notifier.currentParagraph ?? l10n.urlRequestMessage),
+                hiddenMode: hiddenMode,
               ),
             ),
             Expanded(

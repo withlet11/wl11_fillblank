@@ -9,11 +9,11 @@ import '../l10n/app_localizations.dart';
 import '../providers/contents_notifier.dart';
 import '../providers/activity_notifier.dart';
 
-class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+class BackupPage extends StatefulWidget {
+  const BackupPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  State<BackupPage> createState() => _BackupPageState();
 }
 
 enum ImportProcessResult {
@@ -25,7 +25,7 @@ enum ImportProcessResult {
   error,
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _BackupPageState extends State<BackupPage> {
   bool _isLoadingContents = false;
   bool _isSavingContents = false;
 
@@ -42,7 +42,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    final settingsList = <Widget>[
+    final menuList = <Widget>[
       ListTile(
         leading: const Icon(Icons.library_books),
         title: Text(l10n.contentsRestoreLabel),
@@ -108,14 +108,14 @@ class _SettingsPageState extends State<SettingsPage> {
         }
 
         return Scaffold(
-          appBar: AppBar(title: Text(l10n.settingsNavButton)),
+          appBar: AppBar(title: Text(l10n.backupLabel)),
           body: ListView.separated(
-            itemCount: settingsList.length,
+            itemCount: menuList.length,
             separatorBuilder: (context, index) {
               return const Divider(height: 1, thickness: 1);
             },
             itemBuilder: (context, index) {
-              return settingsList[index];
+              return menuList[index];
             },
           ),
         );
@@ -234,35 +234,6 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
   }
-
-  // Future<ImportProcessResult> _addLink(String url) async {
-  //   final contentsNotifier = context.read<ContentsNotifier>();
-  //   if (url.isNotEmpty) {
-  //     try {
-  //       final response = await http.get(Uri.parse(url));
-  //       if (response.statusCode == 200) {
-  //         final document = parser.parse(response.body);
-  //         final pElements = document.getElementsByTagName('p');
-  //         if (pElements.any((element) => element.text.trim().isNotEmpty)) {
-  //           if (contentsNotifier.contains(url)) {
-  //             return ImportProcessResult.alreadyExists;
-  //           } else {
-  //             contentsNotifier.add(url);
-  //             return ImportProcessResult.success;
-  //           }
-  //         } else {
-  //           return ImportProcessResult.noParagraph;
-  //         }
-  //       } else {
-  //         return ImportProcessResult.invalidUrl;
-  //       }
-  //     } catch (e) {
-  //       return ImportProcessResult.error;
-  //     }
-  //   } else {
-  //     return ImportProcessResult.noUrl;
-  //   }
-  // }
 
   Future<void> _saveActivity() async {
     final l10n = AppLocalizations.of(context)!;

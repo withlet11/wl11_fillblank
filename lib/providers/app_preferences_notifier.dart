@@ -4,18 +4,24 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum HiddenMode { wholeWords, beginningOfWords, endOfWords }
+
 class AppPreferencesNotifier extends ChangeNotifier {
   static const String _keyThemeMode = 'theme_mode';
   static const String _keyLanguageCode = 'language_code';
   static const String _keyFontSizeIndex = 'font_size_index';
+  static const String _keyHiddenMode = 'hidden_mode';
 
   static const _fontSizeFactorList = [0.8, 1.0, 1.2, 1.4];
 
+  HiddenMode _hiddenMode = HiddenMode.wholeWords;
   ThemeMode _themeMode = ThemeMode.system;
   Locale _locale = const Locale('en');
   int _fontSizeIndex = 1;
 
   bool get isDarkMode => _themeMode == ThemeMode.dark;
+
+  HiddenMode get hiddenMode => _hiddenMode;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -51,7 +57,27 @@ class AppPreferencesNotifier extends ChangeNotifier {
       _fontSizeIndex = fontSizeIndex;
     }
 
+    final hiddenModeName = prefs.getString(_keyHiddenMode);
+    if (hiddenModeName == null) {
+      _hiddenMode = HiddenMode.wholeWords;
+    } else {
+      try {
+        _hiddenMode = HiddenMode.values.byName(hiddenModeName);
+      } catch (_) {
+        _hiddenMode = HiddenMode.wholeWords;
+      }
+    }
+
     notifyListeners();
+  }
+
+  Future<void> setHiddenMode(HiddenMode mode) async {
+    if (_hiddenMode == mode) return;
+    _hiddenMode = mode;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyHiddenMode, hiddenMode.name);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

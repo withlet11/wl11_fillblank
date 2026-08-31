@@ -1,8 +1,11 @@
 // Copyright 2026 WITHLET11 <withlet11@gmail.com>
 // SPDX-License-Identifier: MIT
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:readblank/providers/app_preferences_notifier.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../l10n/app_localizations.dart';
@@ -11,16 +14,24 @@ import '../providers/contents_notifier.dart';
 import '../style.dart';
 
 class ContentView extends StatefulWidget {
-  const ContentView({super.key, required this.paragraph});
-
   final String paragraph;
+  final HiddenMode hiddenMode;
+
+  const ContentView({
+    super.key,
+    required this.paragraph,
+    required this.hiddenMode,
+  });
 
   @override
   State<ContentView> createState() => _ContentViewState();
 }
 
 class _ContentViewState extends State<ContentView> {
+  static const int _hiddenLetterCount = 3;
+
   late String _paragraph;
+  late HiddenMode _hiddenMode;
   final List<(int, int, bool)> _wordList = [];
   late List<int> _sortedIndexList;
   int _currentIndex = 0;
@@ -36,7 +47,25 @@ class _ContentViewState extends State<ContentView> {
     matches.shuffle();
     int count = matches.length < 2 ? 0 : (matches.length / 5 + 1).toInt();
     for (final match in matches.sublist(0, count)) {
-      _wordList.add((match.start, match.end, true));
+      switch (_hiddenMode) {
+        case HiddenMode.wholeWords:
+          _wordList.add((match.start, match.end, true));
+          break;
+        case HiddenMode.beginningOfWords:
+          _wordList.add((
+            match.start,
+            min(match.start + _hiddenLetterCount, match.end),
+            true,
+          ));
+          break;
+        case HiddenMode.endOfWords:
+          _wordList.add((
+            max(match.end - _hiddenLetterCount, match.start),
+            match.end,
+            true,
+          ));
+          break;
+      }
     }
     _wordList.sort((a, b) => a.$1.compareTo(b.$1));
     _currentIndex = 0;
@@ -88,6 +117,7 @@ class _ContentViewState extends State<ContentView> {
   void initState() {
     super.initState();
     _paragraph = widget.paragraph.trim();
+    _hiddenMode = widget.hiddenMode;
     _prepareWordList();
   }
 
@@ -321,7 +351,7 @@ class _ContentViewState extends State<ContentView> {
         });
         final linkId = context.read<ContentsNotifier>().currentLinkId;
         context.read<ActivityNotifier>().addWord(
-          _paragraph.substring(_wordList[index].$1, _wordList[index].$2),
+          _getWholeWord(_wordList[index].$1, _wordList[index].$2),
           linkId: linkId,
         );
       } else if (_paragraph
@@ -348,10 +378,32 @@ class _ContentViewState extends State<ContentView> {
         });
         final linkId = context.read<ContentsNotifier>().currentLinkId;
         context.read<ActivityNotifier>().addWord(
-          _paragraph.substring(_wordList[index].$1, _wordList[index].$2),
+          _getWholeWord(_wordList[index].$1, _wordList[index].$2),
           linkId: linkId,
         );
       }
     };
+  }
+
+  String _getWholeWord(int start, int end) {
+    if (start == end) return '';
+
+    if (_hiddenMode == HiddenMode.wholeWords) {
+      return _paragraph.substring(start, end);
+    }
+
+    final regex = RegExp(r'\p{L}+', unicode: true);
+    final String temp;
+    final RegExpMatch match;
+
+    if (_hiddenMode == HiddenMode.beginningOfWords) {
+      temp = _paragraph.substring(start - _hiddenLetterCount, end);
+      match = regex.allMatches(temp).toList().last;
+    } else {
+      temp = _paragraph.substring(start, end + _hiddenLetterCount);
+      match = regex.allMatches(temp).toList().first;
+    }
+
+    return temp.substring(match.start, match.end);
   }
 }

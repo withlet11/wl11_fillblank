@@ -1,5 +1,10 @@
 {
   "@@locale": "en",
+  "hiddenPartDescription": "Choose the part of each word to hide.",
+  "hiddenPartLabel": "Hidden Part",
+  "wholeWordsLabel": "Whole",
+  "beginningOfWordsLabel": "Beginning",
+  "endOfWordsLabel": "End",
   "activityBackupCancelledMessage": "Activity backup cancelled.",
   "activityBackupCompletedMessage": "Activity backup completed.",
   "activityBackupLabel": "Backup Activity",
@@ -39,6 +44,8 @@
   "appName": "ReadBlank",
   "appVersion": "0.0.1",
   "backupButton": "Backup",
+  "backupDescription": "Backup & Restore",
+  "backupLabel": "Backup",
   "clipboardEmptyMessage": "The clipboard is empty. Please copy the exported data.",
   "@clipboardEmptyMessage": {
     "description": "Error message shown when the clipboard is empty before importing JSON data."
@@ -175,7 +182,6 @@
   "refreshCacheLabel": "Refresh Cache",
   "restoreButton": "Restore",
   "restoreOriginalButton": "Restore original",
-  "settingsNavButton": "Settings",
   "urlCopyRequest": "Please copy the link from your browser's address bar.",
   "@urlCopyRequest": {
     "description": "Request message when adding a link."

@@ -15,9 +15,7 @@ import '../views/monthly_chart_view.dart';
 import '../views/weekly_chart_view.dart';
 
 class ActivityPage extends StatefulWidget {
-  final String title;
-
-  const ActivityPage({super.key, required this.title});
+  const ActivityPage({super.key});
 
   @override
   State<ActivityPage> createState() => _ActivityPageState();

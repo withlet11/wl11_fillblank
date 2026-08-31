@@ -26,7 +26,7 @@ void main() {
             ChangeNotifierProvider.value(value: activityNotifier),
           ],
           child: MaterialApp(
-            home: Scaffold(body: ReadPage(title: 'Test Page')),
+            home: Scaffold(body: ReadPage()),
           ),
         ),
       );

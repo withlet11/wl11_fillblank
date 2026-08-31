@@ -6,11 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:readblank/screens/plain_text_page.dart';
-import 'package:readblank/screens/settings_page.dart';
+import 'package:readblank/drawers/setting_drawer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:readblank/screens/activity_page.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'drawers/content_selector_drawers.dart';
 import 'l10n/app_localizations.dart';
@@ -170,9 +168,6 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final pref = context.watch<AppPreferencesNotifier>();
-
     return Consumer2<ContentsNotifier, ActivityNotifier>(
       builder: (context, contentsNotifier, activityNotifier, child) {
         return Scaffold(
@@ -180,209 +175,9 @@ class _MainPageState extends State<MainPage> {
               ? _buildAppBarForRead(contentsNotifier)
               : _buildAppBarForLog(activityNotifier),
           body: _selectedIndex == 0
-              ? const ReadPage(key: Key('ReadPage'), title: 'Read')
-              : const ActivityPage(key: Key('ActivityPage'), title: 'Activity'),
-          drawer: _selectedIndex == 0
-              ? NavigationDrawer(
-                  header: SafeArea(
-                    bottom: false,
-                    child: Column(
-                      children: [
-                        Text(
-                          'ReadBlank',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        Image.asset(
-                          'assets/images/app_icon.png',
-                          width: 64,
-                          height: 64,
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(),
-                      ],
-                    ),
-                  ),
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.add_link),
-                      title: Text(l10n.openPageLabel),
-                      subtitle: Text(l10n.openPageDescription),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        contentsNotifier.addLink(l10n, context);
-                      },
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.refresh),
-                      title: Text(l10n.refreshCacheLabel),
-                      subtitle: Text(l10n.refreshCacheDescription),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        contentsNotifier.fetchCurrentContent();
-                        contentsNotifier.persist();
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.text_snippet),
-                      title: Text(l10n.viewPlainTextLabel),
-                      subtitle: Text(l10n.viewPlainTextDescription),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (BuildContext context) {
-                              return PlainTextPage(
-                                title:
-                                    contentsNotifier.currentTitle ??
-                                    l10n.noTitle,
-                                domain: contentsNotifier.currentDomainName,
-                                paragraphs:
-                                    contentsNotifier.currentParagraphList ??
-                                    <String>[],
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.open_in_new),
-                      title: Text(l10n.openInBrowserLabel),
-                      subtitle: Text(l10n.openInBrowserDescription),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        _openWebPageInBrowser(contentsNotifier.currentUrl);
-                      },
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.language),
-                      title: Text(l10n.languageLabel),
-                      trailing: DropdownButton<Locale>(
-                        value: pref.locale,
-                        onChanged: (Locale? locale) {
-                          if (locale != null) pref.setLocale(locale);
-                        },
-                        items: const [
-                          DropdownMenuItem(
-                            value: Locale('en'),
-                            child: Text('English'),
-                          ),
-                          DropdownMenuItem(
-                            value: Locale('hu'),
-                            child: Text('Magyar'),
-                          ),
-                          DropdownMenuItem(
-                            value: Locale('ja'),
-                            child: Text('日本語'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.dark_mode),
-                      title: Text(l10n.darkModeLabel),
-                      trailing: Switch(
-                        value: pref.isDarkMode,
-                        onChanged: (bool value) {
-                          pref.setDarkMode(value);
-                        },
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.format_size),
-                      title: Text(l10n.fontSizeLabel),
-                      trailing: DropdownButton(
-                        items: pref.fontSizeFactorList.indexed.map((entry) {
-                          final (index, factor) = entry;
-                          return DropdownMenuItem(
-                            value: index,
-                            child: Text(
-                              factor < 0.9
-                                  ? l10n.fontSizeSmall
-                                  : factor < 1.1
-                                  ? l10n.fontSizeMedium
-                                  : factor < 1.3
-                                  ? l10n.fontSizeLarge
-                                  : l10n.fontSizeXLarge,
-                            ),
-                          );
-                        }).toList(),
-                        value: pref.fontSizeIndex,
-                        onChanged: (int? index) {
-                          if (index != null) pref.setFontSizeIndex(index);
-                        },
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.settings),
-                      title: Text(l10n.settingsNavButton),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (BuildContext context) {
-                              return const SettingsPage();
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.info_outline),
-                      title: Text(l10n.eulaLabel),
-                      subtitle: Text(l10n.eulaDescription),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(l10n.eulaDialogTitle),
-                            content: SingleChildScrollView(
-                              child: Text(l10n.eulaText),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: Text(l10n.commonClose),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.library_books),
-                      title: Text(l10n.licensesLabel),
-                      subtitle: Text(l10n.licensesDescription),
-                      onTap: () {
-                        Navigator.of(context).pop();
-
-                        showAboutDialog(
-                          context: context,
-                          applicationName: l10n.appName,
-                          applicationVersion: l10n.appVersion,
-                          applicationLegalese: l10n.appLegalese,
-                          applicationIcon: Image.asset(
-                            'assets/images/app_icon.png',
-                            width: 64,
-                            height: 64,
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                )
-              : null,
+              ? const ReadPage()
+              : const ActivityPage(),
+          drawer: _selectedIndex == 0 ? const SettingDrawer() : null,
           endDrawer: const ContentSelectorDrawers(),
           endDrawerEnableOpenDragGesture: false,
           bottomNavigationBar: _buildNavigationBar(),
@@ -432,15 +227,6 @@ class _MainPageState extends State<MainPage> {
         ),
       ],
     );
-  }
-
-  Future<void> _openWebPageInBrowser(String url) async {
-    if (!await launchUrl(
-      Uri.parse(url),
-      mode: LaunchMode.externalApplication,
-    )) {
-      throw Exception('Could not launch $url');
-    }
   }
 
   AppBar _buildAppBarForLog(ActivityNotifier activityNotifier) {
