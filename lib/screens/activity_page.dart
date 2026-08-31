@@ -339,38 +339,43 @@ class _ActivityPageState extends State<ActivityPage> {
     }).toList();
   }
 
-  Widget _buildTabbedWordList(
-    String keyString,
-    List<WordSummary> entries,
-    ContentsNotifier contentsNotifier,
-    List<Map<String, dynamic>> viewedContents,
-  ) {
+  Widget _buildNestedScrollView({
+    required Widget header,
+    required String keyString,
+    required List<WordSummary> entries,
+    required ContentsNotifier contentsNotifier,
+    required List<Map<String, dynamic>> viewedContents,
+  }) {
     final l10n = AppLocalizations.of(context)!;
 
-    return Expanded(
-      child: Column(
-        children: [
-          TabBar(
-            labelStyle: Theme.of(context).textTheme.bodySmall,
-            tabs: [
-              Tab(
-                text: l10n.contentsViewedLabel,
-                icon: const Icon(Icons.library_books),
+    return NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) {
+        return [
+          SliverToBoxAdapter(child: header),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SliverAppBarDelegate(
+              TabBar(
+                labelStyle: Theme.of(context).textTheme.bodySmall,
+                tabs: [
+                  Tab(
+                    text: l10n.contentsViewedLabel,
+                    icon: const Icon(Icons.library_books),
+                  ),
+                  Tab(
+                    text: l10n.wordsEncounteredLabel,
+                    icon: const Icon(Icons.abc),
+                  ),
+                ],
               ),
-              Tab(
-                text: l10n.wordsEncounteredLabel,
-                icon: const Icon(Icons.abc),
-              ),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildContentList(viewedContents),
-                _buildWordList(keyString, entries, contentsNotifier),
-              ],
             ),
           ),
+        ];
+      },
+      body: TabBarView(
+        children: [
+          _buildContentList(viewedContents),
+          _buildWordList(keyString, entries, contentsNotifier),
         ],
       ),
     );
@@ -399,81 +404,77 @@ class _ActivityPageState extends State<ActivityPage> {
 
     final entries = activityNotifier.currentWordEntries;
 
-    return Column(
-      children: [
-        Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_left),
-                  onPressed: _isOnOrBeforeStartDate(selectedDate)
-                      ? null
-                      : () {
-                          activityNotifier.selectedDate = _getOneDayAgo(
-                            selectedDate,
-                          );
-                        },
-                ),
-                Text(
-                  l10n.dateFormatForDailyChart(selectedDate),
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_right),
-                  onPressed: _isOnOrAfterToday(selectedDate)
-                      ? null
-                      : () {
-                          activityNotifier.selectedDate = _getOneDayLater(
-                            selectedDate,
-                          );
-                        },
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.abc),
-                Text(l10n.wordCount(activityNotifier.currentCount)),
-              ],
-            ),
-            DailyChartView(
-              key: UniqueKey(),
-              controller: _dailyChartController,
-              currentData: currentData,
-              previousData: previousData,
-              nextData: nextData,
-              barColor: Theme.of(context).colorScheme.tertiary,
-              textColor: Theme.of(context).colorScheme.onSurface,
-              fontSize: 12.0 * fontSizeFactor,
-              onSwipeLeft: _isOnOrAfterToday(selectedDate)
-                  ? null
-                  : () {
-                      activityNotifier.selectedDate = _getOneDayLater(
-                        selectedDate,
-                      );
-                    },
-              onSwipeRight: _isOnOrBeforeStartDate(selectedDate)
-                  ? null
-                  : () {
-                      activityNotifier.selectedDate = _getOneDayAgo(
-                        selectedDate,
-                      );
-                    },
-            ),
-            SizedBox(height: 16),
-            Divider(height: 1),
-          ],
-        ),
-        _buildTabbedWordList(
-          'Daily_$selectedDate',
-          entries,
-          contentsNotifier,
-          viewedContents,
-        ),
-      ],
+    return _buildNestedScrollView(
+      header: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_left),
+                onPressed: _isOnOrBeforeStartDate(selectedDate)
+                    ? null
+                    : () {
+                        activityNotifier.selectedDate = _getOneDayAgo(
+                          selectedDate,
+                        );
+                      },
+              ),
+              Text(
+                l10n.dateFormatForDailyChart(selectedDate),
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_right),
+                onPressed: _isOnOrAfterToday(selectedDate)
+                    ? null
+                    : () {
+                        activityNotifier.selectedDate = _getOneDayLater(
+                          selectedDate,
+                        );
+                      },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.abc),
+              Text(l10n.wordCount(activityNotifier.currentCount)),
+            ],
+          ),
+          DailyChartView(
+            key: UniqueKey(),
+            controller: _dailyChartController,
+            currentData: currentData,
+            previousData: previousData,
+            nextData: nextData,
+            barColor: Theme.of(context).colorScheme.tertiary,
+            textColor: Theme.of(context).colorScheme.onSurface,
+            fontSize: 12.0 * fontSizeFactor,
+            onSwipeLeft: _isOnOrAfterToday(selectedDate)
+                ? null
+                : () {
+                    activityNotifier.selectedDate = _getOneDayLater(
+                      selectedDate,
+                    );
+                  },
+            onSwipeRight: _isOnOrBeforeStartDate(selectedDate)
+                ? null
+                : () {
+                    activityNotifier.selectedDate = _getOneDayAgo(
+                      selectedDate,
+                    );
+                  },
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+        ],
+      ),
+      keyString: 'Daily_$selectedDate',
+      entries: entries,
+      contentsNotifier: contentsNotifier,
+      viewedContents: viewedContents,
     );
   }
 
@@ -511,95 +512,91 @@ class _ActivityPageState extends State<ActivityPage> {
 
     final entries = activityNotifier.currentWordEntries;
 
-    return Column(
-      children: [
-        Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_left),
-                  onPressed: _isInOrBeforeStartWeek(selectedDate)
-                      ? null
-                      : () {
-                          activityNotifier.selectedDate = _getSevenDaysAgo(
-                            selectedDate,
-                          );
-                        },
+    return _buildNestedScrollView(
+      header: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_left),
+                onPressed: _isInOrBeforeStartWeek(selectedDate)
+                    ? null
+                    : () {
+                        activityNotifier.selectedDate = _getSevenDaysAgo(
+                          selectedDate,
+                        );
+                      },
+              ),
+              Expanded(
+                child: Text(
+                  _dateLabelForWeeklyChart(selectedDate),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                Expanded(
-                  child: Text(
-                    _dateLabelForWeeklyChart(selectedDate),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_right),
-                  onPressed: _isInOrAfterThisWeek(selectedDate)
-                      ? null
-                      : () {
-                          activityNotifier.selectedDate = _getSevenDaysLater(
-                            selectedDate,
-                          );
-                        },
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.abc),
-                Text(l10n.wordCount(activityNotifier.currentCount)),
-              ],
-            ),
-            WeeklyChartView(
-              key: UniqueKey(),
-              controller: _weeklyChartController,
-              currentData: currentData,
-              previousData: previousData,
-              nextData: nextData,
-              barColor: Theme.of(context).colorScheme.tertiary,
-              textColor: Theme.of(context).colorScheme.onSurface,
-              fontSize: 12.0 * fontSizeFactor,
-              onSwipeLeft: _isInOrAfterThisWeek(selectedDate)
-                  ? null
-                  : () {
-                      activityNotifier.selectedDate = _getSevenDaysLater(
-                        selectedDate,
-                      );
-                    },
-              onSwipeRight: _isInOrBeforeStartWeek(selectedDate)
-                  ? null
-                  : () {
-                      activityNotifier.selectedDate = _getSevenDaysAgo(
-                        selectedDate,
-                      );
-                    },
-              onDailyViewSelected: (int index) {
-                final tappedDate = _getStartDayOfWeek(
-                  selectedDate,
-                ).add(Duration(days: index));
+              ),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_right),
+                onPressed: _isInOrAfterThisWeek(selectedDate)
+                    ? null
+                    : () {
+                        activityNotifier.selectedDate = _getSevenDaysLater(
+                          selectedDate,
+                        );
+                      },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.abc),
+              Text(l10n.wordCount(activityNotifier.currentCount)),
+            ],
+          ),
+          WeeklyChartView(
+            key: UniqueKey(),
+            controller: _weeklyChartController,
+            currentData: currentData,
+            previousData: previousData,
+            nextData: nextData,
+            barColor: Theme.of(context).colorScheme.tertiary,
+            textColor: Theme.of(context).colorScheme.onSurface,
+            fontSize: 12.0 * fontSizeFactor,
+            onSwipeLeft: _isInOrAfterThisWeek(selectedDate)
+                ? null
+                : () {
+                    activityNotifier.selectedDate = _getSevenDaysLater(
+                      selectedDate,
+                    );
+                  },
+            onSwipeRight: _isInOrBeforeStartWeek(selectedDate)
+                ? null
+                : () {
+                    activityNotifier.selectedDate = _getSevenDaysAgo(
+                      selectedDate,
+                    );
+                  },
+            onDailyViewSelected: (int index) {
+              final tappedDate = _getStartDayOfWeek(
+                selectedDate,
+              ).add(Duration(days: index));
 
-                if (_isNotInRange(tappedDate)) return;
+              if (_isNotInRange(tappedDate)) return;
 
-                activityNotifier.selectedDate = tappedDate;
-                activityNotifier.viewMode = ActivityViewMode.daily;
-              },
-            ),
-            SizedBox(height: 16),
-            Divider(height: 1),
-          ],
-        ),
-        _buildTabbedWordList(
-          'Weekly_$selectedDate',
-          entries,
-          contentsNotifier,
-          viewedContents,
-        ),
-      ],
+              activityNotifier.selectedDate = tappedDate;
+              activityNotifier.viewMode = ActivityViewMode.daily;
+            },
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+        ],
+      ),
+      keyString: 'Weekly_$selectedDate',
+      entries: entries,
+      contentsNotifier: contentsNotifier,
+      viewedContents: viewedContents,
     );
   }
 
@@ -620,102 +617,125 @@ class _ActivityPageState extends State<ActivityPage> {
 
     final entries = activityNotifier.currentWordEntries;
 
-    return Column(
-      children: [
-        Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_left),
-                  onPressed: _isInOrBeforeStartMonth(selectedDate)
-                      ? null
-                      : () {
-                          activityNotifier.selectedDate = _getOneMonthAgo(
-                            selectedDate,
-                          );
-                        },
+    return _buildNestedScrollView(
+      header: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_left),
+                onPressed: _isInOrBeforeStartMonth(selectedDate)
+                    ? null
+                    : () {
+                        activityNotifier.selectedDate = _getOneMonthAgo(
+                          selectedDate,
+                        );
+                      },
+              ),
+              Expanded(
+                child: Text(
+                  l10n.dateFormatForMonthlyChart(selectedDate),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                Expanded(
-                  child: Text(
-                    l10n.dateFormatForMonthlyChart(selectedDate),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_right),
-                  onPressed: _isInOrAfterThisMonth(selectedDate)
-                      ? null
-                      : () {
-                          activityNotifier.selectedDate = _getOneMonthLater(
-                            selectedDate,
-                          );
-                        },
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.abc),
-                Text(l10n.wordCount(activityNotifier.currentCount)),
-              ],
-            ),
-            MonthlyChartView(
-              key: UniqueKey(),
-              controller: _monthlyChartController,
-              currentData: currentData,
-              previousData: previousData,
-              nextData: nextData,
-              startWeekDay: _getStartDayOfMonth(selectedDate).weekday - 1,
-              circleColor: Theme.of(context).colorScheme.tertiary,
-              textColor: Theme.of(context).colorScheme.onSurface,
-              fontSize: 12.0 * fontSizeFactor,
-              onSwipeLeft: _isInOrAfterThisMonth(selectedDate)
-                  ? null
-                  : () {
-                      activityNotifier.selectedDate = _getOneMonthLater(
-                        selectedDate,
-                      );
-                    },
-              onSwipeRight: _isInOrBeforeStartMonth(selectedDate)
-                  ? null
-                  : () {
-                      activityNotifier.selectedDate = _getOneMonthAgo(
-                        selectedDate,
-                      );
-                    },
-              onDailyViewSelected: (int index) {
-                final startOffset =
-                    _getStartDayOfMonth(selectedDate).weekday - 1;
-                final tappedDate = DateTime(
-                  selectedDate.year,
-                  selectedDate.month,
-                  index - startOffset + 1,
-                );
+              ),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_right),
+                onPressed: _isInOrAfterThisMonth(selectedDate)
+                    ? null
+                    : () {
+                        activityNotifier.selectedDate = _getOneMonthLater(
+                          selectedDate,
+                        );
+                      },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.abc),
+              Text(l10n.wordCount(activityNotifier.currentCount)),
+            ],
+          ),
+          MonthlyChartView(
+            key: UniqueKey(),
+            controller: _monthlyChartController,
+            currentData: currentData,
+            previousData: previousData,
+            nextData: nextData,
+            startWeekDay: _getStartDayOfMonth(selectedDate).weekday - 1,
+            circleColor: Theme.of(context).colorScheme.tertiary,
+            textColor: Theme.of(context).colorScheme.onSurface,
+            fontSize: 12.0 * fontSizeFactor,
+            onSwipeLeft: _isInOrAfterThisMonth(selectedDate)
+                ? null
+                : () {
+                    activityNotifier.selectedDate = _getOneMonthLater(
+                      selectedDate,
+                    );
+                  },
+            onSwipeRight: _isInOrBeforeStartMonth(selectedDate)
+                ? null
+                : () {
+                    activityNotifier.selectedDate = _getOneMonthAgo(
+                      selectedDate,
+                    );
+                  },
+            onDailyViewSelected: (int index) {
+              final startOffset = _getStartDayOfMonth(selectedDate).weekday - 1;
+              final tappedDate = DateTime(
+                selectedDate.year,
+                selectedDate.month,
+                index - startOffset + 1,
+              );
 
-                if (!_isInSameMonth(tappedDate, selectedDate) ||
-                    _isNotInRange(tappedDate)) {
-                  return;
-                }
+              if (!_isInSameMonth(tappedDate, selectedDate) ||
+                  _isNotInRange(tappedDate)) {
+                return;
+              }
 
-                activityNotifier.selectedDate = tappedDate;
-                activityNotifier.viewMode = ActivityViewMode.daily;
-              },
-            ),
-            SizedBox(height: 16),
-            Divider(height: 1),
-          ],
-        ),
-        _buildTabbedWordList(
-          'Monthly_$selectedDate',
-          entries,
-          contentsNotifier,
-          viewedContents,
-        ),
-      ],
+              activityNotifier.selectedDate = tappedDate;
+              activityNotifier.viewMode = ActivityViewMode.daily;
+            },
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+        ],
+      ),
+      keyString: 'Monthly_$selectedDate',
+      entries: entries,
+      contentsNotifier: contentsNotifier,
+      viewedContents: viewedContents,
     );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }
