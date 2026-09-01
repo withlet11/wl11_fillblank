@@ -69,6 +69,7 @@ class _ReadPageState extends State<ReadPage> {
                     ? ''
                     : (notifier.currentParagraph ?? l10n.urlRequestMessage),
                 hiddenMode: hiddenMode,
+                locale: notifier.currentLocale,
               ),
             ),
             Expanded(

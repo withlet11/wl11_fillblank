@@ -368,6 +368,8 @@ class ContentsNotifier extends ChangeNotifier {
 
   String get currentLinkId => _selectedEntry?[_keyLinkId];
 
+  Locale get currentLocale => Locale(_selectedEntry?[_keyLocale]);
+
   String get currentTimestamp {
     return _selectedEntry == null
         ? ''
@@ -388,7 +390,13 @@ class ContentsNotifier extends ChangeNotifier {
   // Current paragraph
   String? get currentParagraph => currentParagraphList?[_currentParagraphIndex];
 
-  int get currentParagraphIndex => _currentParagraphIndex;
+  int get currentParagraphIndex {
+    if (currentParagraphList != null && currentParagraphList!.length <= _currentParagraphIndex) {
+      _currentParagraphIndex = currentParagraphList!.length - 1;
+      _linkList.first[_keyLastViewedParagraphIndex] = _currentParagraphIndex;
+    }
+    return _currentParagraphIndex;
+  }
 
   Future<void> setCurrentParagraphIndex(int index) async {
     if (_currentParagraphIndex != index) {

@@ -36,6 +36,7 @@ dependencies:
   csv: any
   cupertino_icons: any
   file_picker: ^10.3.10
+  flutter_tts: any
   html: any
   http: any
   intl: any

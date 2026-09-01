@@ -3,6 +3,7 @@
 
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:readblank/providers/app_preferences_notifier.dart';
@@ -11,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/activity_notifier.dart';
 import '../providers/contents_notifier.dart';
+import '../services/text_to_speech_service.dart';
 import '../style.dart';
 
 class WordRange {
@@ -33,11 +35,13 @@ class WordRange {
 class ContentView extends StatefulWidget {
   final String paragraph;
   final HiddenMode hiddenMode;
+  final Locale locale;
 
   const ContentView({
     super.key,
     required this.paragraph,
     required this.hiddenMode,
+    required this.locale,
   });
 
   @override
@@ -57,6 +61,10 @@ class _ContentViewState extends State<ContentView> {
   final ScrollController _scrollController1 = ScrollController();
   final ScrollController _scrollController2 = ScrollController();
   final GlobalKey _targetKey = GlobalKey();
+
+  final TextToSpeechService _ttsService = TextToSpeechService();
+
+  // bool _isPlaying = false;
 
   void _prepareWordList() {
     final regex = RegExp(r'\p{L}+', unicode: true);
@@ -134,12 +142,39 @@ class _ContentViewState extends State<ContentView> {
     );
   }
 
+  void _toggleSpeak() async {
+    if (_ttsService.state == TtsState.playing) {
+      await _ttsService.stop();
+    } else {
+      await _ttsService.speak(_paragraph);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _paragraph = widget.paragraph.trim();
     _hiddenMode = widget.hiddenMode;
     _prepareWordList();
+    _ttsService.initTts(language: widget.locale.languageCode);
+
+    _ttsService.onStart = () {
+      if (mounted) setState(() {});
+    };
+
+    _ttsService.onComplete = () {
+      if (mounted) setState(() {});
+    };
+
+    _ttsService.onError = (msg) {
+      if (mounted) setState(() {});
+    };
+  }
+
+  @override
+  void dispose() {
+    _ttsService.dispose();
+    super.dispose();
   }
 
   @override
@@ -192,39 +227,47 @@ class _ContentViewState extends State<ContentView> {
       String visibleText = _paragraph.substring(index, word.start);
       String invisibleText = _paragraph.substring(word.start, word.end);
       if (visibleText.isNotEmpty) {
-        spans.add(TextSpan(text: '\ufeff$visibleText\ufeff'));
+        spans.add(TextSpan(text: visibleText));
       }
       if (invisibleText.isNotEmpty) {
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectWordWithStart(word.start);
-                });
-              },
-              child: SizedBox(
-                key: word.start == selectedWord.start ? _targetKey : null,
-                child: Text(
-                  invisibleText,
-                  style: scaledTextStyle.copyWith(
-                    color: word.isHidden ? Colors.transparent : palette.text,
-                    backgroundColor: word.start == selectedWord.start
-                        ? palette.accent
-                        : palette.muted,
-                  ),
-                ),
-              ),
-            ),
+        final invisiblePart = TextSpan(
+          text: invisibleText,
+          style: scaledTextStyle.copyWith(
+            color: word.isHidden ? Colors.transparent : palette.text,
+            backgroundColor: word.start == selectedWord.start
+                ? palette.accent
+                : palette.muted,
           ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              setState(() {
+                _selectWordWithStart(word.start);
+              });
+            },
         );
+
+        if (word.start == selectedWord.start) {
+          final anchor = WidgetSpan(
+            child: SizedBox(key: _targetKey, height: 0, width: 0),
+          );
+
+          if (_hiddenMode == HiddenMode.endOfWords) {
+            spans.add(invisiblePart);
+            spans.add(anchor);
+          } else {
+            spans.add(anchor);
+            spans.add(invisiblePart);
+          }
+        } else {
+          spans.add(invisiblePart);
+        }
       }
+
       index = word.end;
     }
+
     if (index < _paragraph.length) {
-      spans.add(TextSpan(text: '\ufeff${_paragraph.substring(index)}'));
+      spans.add(TextSpan(text: _paragraph.substring(index)));
     }
 
     return Scrollbar(
@@ -287,6 +330,14 @@ class _ContentViewState extends State<ContentView> {
                     );
                   },
             icon: const Icon(Icons.share),
+          ),
+          IconButton.filled(
+            icon: Icon(
+              _ttsService.state == TtsState.playing
+                  ? Icons.stop
+                  : Icons.volume_up,
+            ),
+            onPressed: _toggleSpeak,
           ),
         ],
       ),
