@@ -13,6 +13,23 @@ import '../providers/activity_notifier.dart';
 import '../providers/contents_notifier.dart';
 import '../style.dart';
 
+class WordRange {
+  final int start;
+  final int end;
+  final bool isHidden;
+
+  const WordRange(this.start, this.end, this.isHidden);
+
+  factory WordRange.fromMatch(RegExpMatch match, bool isHidden) =>
+      WordRange(match.start, match.end, isHidden);
+
+  WordRange copyWith({int? start, int? end, bool? isHidden}) => WordRange(
+    start ?? this.start,
+    end ?? this.end,
+    isHidden ?? this.isHidden,
+  );
+}
+
 class ContentView extends StatefulWidget {
   final String paragraph;
   final HiddenMode hiddenMode;
@@ -32,7 +49,7 @@ class _ContentViewState extends State<ContentView> {
 
   late String _paragraph;
   late HiddenMode _hiddenMode;
-  final List<(int, int, bool)> _wordList = [];
+  final List<WordRange> _hiddenWords = [];
   late List<int> _sortedIndexList;
   int _currentIndex = 0;
 
@@ -49,42 +66,46 @@ class _ContentViewState extends State<ContentView> {
     for (final match in matches.sublist(0, count)) {
       switch (_hiddenMode) {
         case HiddenMode.wholeWords:
-          _wordList.add((match.start, match.end, true));
+          _hiddenWords.add(WordRange.fromMatch(match, true));
           break;
         case HiddenMode.beginningOfWords:
-          _wordList.add((
-            match.start,
-            min(match.start + _hiddenLetterCount, match.end),
-            true,
-          ));
+          _hiddenWords.add(
+            WordRange(
+              match.start,
+              min(match.start + _hiddenLetterCount, match.end),
+              true,
+            ),
+          );
           break;
         case HiddenMode.endOfWords:
-          _wordList.add((
-            max(match.end - _hiddenLetterCount, match.start),
-            match.end,
-            true,
-          ));
+          _hiddenWords.add(
+            WordRange(
+              max(match.end - _hiddenLetterCount, match.start),
+              match.end,
+              true,
+            ),
+          );
           break;
       }
     }
-    _wordList.sort((a, b) => a.$1.compareTo(b.$1));
+    _hiddenWords.sort((a, b) => a.start.compareTo(b.start));
     _currentIndex = 0;
 
-    _sortedIndexList = List.generate(_wordList.length, (index) => index);
+    _sortedIndexList = List.generate(_hiddenWords.length, (index) => index);
     _sortedIndexList.sort(
       (a, b) => _paragraph
-          .substring(_wordList[a].$1, _wordList[a].$2)
+          .substring(_hiddenWords[a].start, _hiddenWords[a].end)
           .toLowerCase()
           .compareTo(
             _paragraph
-                .substring(_wordList[b].$1, _wordList[b].$2)
+                .substring(_hiddenWords[b].start, _hiddenWords[b].end)
                 .toLowerCase(),
           ),
     );
   }
 
   void _moveNextWord() {
-    if (_currentIndex < _wordList.length - 1) {
+    if (_currentIndex < _hiddenWords.length - 1) {
       ++_currentIndex;
     }
     _scrollToTarget();
@@ -98,7 +119,7 @@ class _ContentViewState extends State<ContentView> {
   }
 
   void _selectWordWithStart(int start) {
-    int index = _wordList.indexWhere((element) => element.$1 == start);
+    int index = _hiddenWords.indexWhere((element) => element.start == start);
     if (index != -1) {
       _currentIndex = index;
     }
@@ -156,14 +177,55 @@ class _ContentViewState extends State<ContentView> {
   }
 
   Widget _buildTextView(double height, ContentViewPalette palette) {
-    final (selectedStart, selectedEnd, _) = _wordList.isNotEmpty
-        ? _wordList[_currentIndex]
-        : const (0, 0, true);
+    final selectedWord = _hiddenWords.isNotEmpty
+        ? _hiddenWords[_currentIndex]
+        : const WordRange(0, 0, true);
     final textScaler = MediaQuery.textScalerOf(context);
     final textStyle = Theme.of(context).textTheme.bodyLarge!;
     final scaledTextStyle = textStyle.copyWith(
       fontSize: textScaler.scale(textStyle.fontSize ?? 16.0),
     );
+
+    int index = 0;
+    List<InlineSpan> spans = [];
+    for (final word in _hiddenWords) {
+      String visibleText = _paragraph.substring(index, word.start);
+      String invisibleText = _paragraph.substring(word.start, word.end);
+      if (visibleText.isNotEmpty) {
+        spans.add(TextSpan(text: '\ufeff$visibleText\ufeff'));
+      }
+      if (invisibleText.isNotEmpty) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectWordWithStart(word.start);
+                });
+              },
+              child: SizedBox(
+                key: word.start == selectedWord.start ? _targetKey : null,
+                child: Text(
+                  invisibleText,
+                  style: scaledTextStyle.copyWith(
+                    color: word.isHidden ? Colors.transparent : palette.text,
+                    backgroundColor: word.start == selectedWord.start
+                        ? palette.accent
+                        : palette.muted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      index = word.end;
+    }
+    if (index < _paragraph.length) {
+      spans.add(TextSpan(text: '\ufeff${_paragraph.substring(index)}'));
+    }
 
     return Scrollbar(
       controller: _scrollController1,
@@ -178,58 +240,7 @@ class _ContentViewState extends State<ContentView> {
           controller: _scrollController1,
           // Auto-scaling doesn't work well with text.
           child: MediaQuery.withNoTextScaling(
-            child: Text.rich(
-              TextSpan(
-                style: scaledTextStyle,
-                children: [
-                  ...() {
-                    int index = 0;
-                    List<InlineSpan> spans = [];
-                    for (final (start, end, isActive) in _wordList) {
-                      String visibleText = _paragraph.substring(index, start);
-                      String invisibleText = _paragraph.substring(start, end);
-                      if (visibleText.isNotEmpty) {
-                        spans.add(TextSpan(text: visibleText));
-                      }
-                      if (invisibleText.isNotEmpty) {
-                        spans.add(
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.baseline,
-                            baseline: TextBaseline.alphabetic,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectWordWithStart(start);
-                                });
-                              },
-                              child: SizedBox(
-                                key: start == selectedStart ? _targetKey : null,
-                                child: Text(
-                                  invisibleText,
-                                  style: scaledTextStyle.copyWith(
-                                    color: isActive
-                                        ? Colors.transparent
-                                        : palette.text,
-                                    backgroundColor: start == selectedStart
-                                        ? palette.accent
-                                        : palette.muted,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      index = end;
-                    }
-                    if (index < _paragraph.length) {
-                      spans.add(TextSpan(text: _paragraph.substring(index)));
-                    }
-                    return spans;
-                  }(),
-                ],
-              ),
-            ),
+            child: Text.rich(TextSpan(style: scaledTextStyle, children: spans)),
           ),
         ),
       ),
@@ -254,7 +265,7 @@ class _ContentViewState extends State<ContentView> {
             icon: const Icon(Icons.keyboard_arrow_left),
           ),
           IconButton.filled(
-            onPressed: _currentIndex < _wordList.length - 1
+            onPressed: _currentIndex < _hiddenWords.length - 1
                 ? () {
                     setState(() {
                       _moveNextWord();
@@ -265,18 +276,13 @@ class _ContentViewState extends State<ContentView> {
           ),
           IconButton.filled(
             onPressed:
-                (_currentIndex >= _wordList.length ||
-                    _wordList[_currentIndex].$3)
+                (_currentIndex >= _hiddenWords.length ||
+                    _hiddenWords[_currentIndex].isHidden)
                 ? null
                 : () async {
                     SharePlus.instance.share(
                       ShareParams(
-                        text: _paragraph
-                            .substring(
-                              _wordList[_currentIndex].$1,
-                              _wordList[_currentIndex].$2,
-                            )
-                            .toLowerCase(),
+                        text: _getWholeWord(_hiddenWords[_currentIndex]),
                       ),
                     );
                   },
@@ -315,10 +321,15 @@ class _ContentViewState extends State<ContentView> {
                       ),
                       minimumSize: Size.zero,
                     ),
-                    onPressed: _wordList[index].$3 ? _checkAnswer(index) : null,
+                    onPressed: _hiddenWords[index].isHidden
+                        ? _checkAnswer(index)
+                        : null,
                     child: Text(
                       _paragraph
-                          .substring(_wordList[index].$1, _wordList[index].$2)
+                          .substring(
+                            _hiddenWords[index].start,
+                            _hiddenWords[index].end,
+                          )
                           .toLowerCase(),
                     ),
                   ),
@@ -331,8 +342,10 @@ class _ContentViewState extends State<ContentView> {
   }
 
   void Function() _checkAnswer(int index) {
+    final word = _hiddenWords[index];
+    final currentWord = _hiddenWords[_currentIndex];
     return () {
-      if (!_wordList[_currentIndex].$3) {
+      if (!currentWord.isHidden) {
         // Selected field is already filled.
         if (mounted) {
           final l10n = AppLocalizations.of(context)!;
@@ -345,23 +358,18 @@ class _ContentViewState extends State<ContentView> {
         }
       } else if (index == _currentIndex) {
         // Selected field index is correct.
-        _wordList[index] = (_wordList[index].$1, _wordList[index].$2, false);
+        _hiddenWords[index] = currentWord.copyWith(isHidden: false);
         setState(() {
           _moveNextWord();
         });
         final linkId = context.read<ContentsNotifier>().currentLinkId;
         context.read<ActivityNotifier>().addWord(
-          _getWholeWord(_wordList[index].$1, _wordList[index].$2),
+          _getWholeWord(_hiddenWords[index]),
           linkId: linkId,
         );
-      } else if (_paragraph
-              .substring(_wordList[index].$1, _wordList[index].$2)
-              .toLowerCase() ==
+      } else if (_paragraph.substring(word.start, word.end).toLowerCase() ==
           _paragraph
-              .substring(
-                _wordList[_currentIndex].$1,
-                _wordList[_currentIndex].$2,
-              )
+              .substring(currentWord.start, currentWord.end)
               .toLowerCase()) {
         // Selected field word is correct.
         setState(() {
@@ -369,41 +377,34 @@ class _ContentViewState extends State<ContentView> {
           int index2 = _sortedIndexList.indexOf(_currentIndex);
           _sortedIndexList[index1] = _currentIndex;
           _sortedIndexList[index2] = index;
-          _wordList[_currentIndex] = (
-            _wordList[_currentIndex].$1,
-            _wordList[_currentIndex].$2,
-            false,
-          );
+          _hiddenWords[_currentIndex] = currentWord.copyWith(isHidden: false);
           _moveNextWord();
         });
         final linkId = context.read<ContentsNotifier>().currentLinkId;
         context.read<ActivityNotifier>().addWord(
-          _getWholeWord(_wordList[index].$1, _wordList[index].$2),
+          _getWholeWord(word),
           linkId: linkId,
         );
       }
     };
   }
 
-  String _getWholeWord(int start, int end) {
+  String _getWholeWord(WordRange word) {
+    final start = word.start;
+    final end = word.end;
     if (start == end) return '';
 
     if (_hiddenMode == HiddenMode.wholeWords) {
       return _paragraph.substring(start, end);
     }
 
-    final regex = RegExp(r'\p{L}+', unicode: true);
-    final String temp;
-    final RegExpMatch match;
+    final (regex, temp) = _hiddenMode == HiddenMode.beginningOfWords
+        ? (RegExp(r'^\p{L}+', unicode: true), _paragraph.substring(start))
+        : (RegExp(r'\p{L}+$', unicode: true), _paragraph.substring(0, end));
 
-    if (_hiddenMode == HiddenMode.beginningOfWords) {
-      temp = _paragraph.substring(start - _hiddenLetterCount, end);
-      match = regex.allMatches(temp).toList().last;
-    } else {
-      temp = _paragraph.substring(start, end + _hiddenLetterCount);
-      match = regex.allMatches(temp).toList().first;
-    }
-
-    return temp.substring(match.start, match.end);
+    final match = regex.firstMatch(temp);
+    return match == null
+        ? _paragraph.substring(start, end)
+        : temp.substring(match.start, match.end);
   }
 }
